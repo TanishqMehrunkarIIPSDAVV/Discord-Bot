@@ -11,8 +11,8 @@ const vcUpdate=()=>
         else if(newState.channelId===null) ch.send(`VC me vaapis aa laude ${userMention(oldState.id)}`);
         else if(oldState.selfDeaf !== newState.selfDeaf)
         {
-            if(newState.selfDeaf) ch.send(`Deaf ho gaya ${userMention(newState.id)} laude`);
-            else ch.send(`Undeaf ho gaya ${userMention(newState.id)} laude`);
+            if(newState.selfDeaf) ch.send(`Deafen ho gaya ${userMention(newState.id)} laude`);
+            else ch.send(`Undeafen ho gaya ${userMention(newState.id)} laude`);
         }
         else if(oldState.selfMute !== newState.selfMute)
         {
