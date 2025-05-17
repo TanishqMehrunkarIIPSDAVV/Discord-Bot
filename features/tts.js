@@ -7,6 +7,8 @@ const tts = ()=>{
     client.on('messageCreate', async (message) => {
         if (message.content.startsWith('op tts')) {
             const text = message.content.slice(7);
+            if (text.length === 0) return message.reply('Please provide some text to convert to speech.');
+            if (text.length > 200) return message.reply('Text is too long. Please limit it to 200 characters.');
             const voiceChannel = message.member.voice.channel;
             if (!voiceChannel) {
                 return message.reply('Join a voice channel first!');
