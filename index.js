@@ -54,5 +54,7 @@ const vcUpdate=require("./features/vcUpdate");
 vcUpdate();
 const help=require("./features/help");
 help();
+const tts=require("./features/tts");
+tts();
 client.login(token);
 console.log('tested');

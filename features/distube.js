@@ -98,7 +98,9 @@ const distubeFunc = () => {
                   )
                   .join("\n")
             );
-          } else message.channel.send("Invalid command!!!");
+          } 
+          else if(command === "tts" || command === "disconnect") {}
+          else message.channel.send("Invalid command!!!");
         }
       }
     }

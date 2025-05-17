@@ -1,16 +1,4 @@
 const { SlashCommandBuilder,channelMention,userMention,roleMention} = require('discord.js');
-const { EmbedBuilder } = require('discord.js');
-
-// const exampleEmbed = new EmbedBuilder()
-// 	.setColor(0x0099FF)
-// 	.setTitle('Kicked')
-//   .setURL('https://tenor.com/bvi31.gif')
-// 	.setDescription('KO!!!!')
-//   .setImage('https://tenor.com/bvi31.gif')
-
-const { AttachmentBuilder } = require('discord.js');
-// ...
-const file = new AttachmentBuilder('../assets/discordjs.png');
 
 const arr=[
 "https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExOTExNjIyZWM3MDQ4NjRlODJlMTQzM2JjNjMxYjNkNjQ2NmQ5NjMwYiZlcD12MV9pbnRlcm5hbF9naWZzX2dpZklkJmN0PWc/XYEEvoX0Ub69ZgN9ai/giphy.gif",
@@ -34,6 +22,5 @@ module.exports = {
     if(!member) return;
     const u=userMention(member.id);
 		return interaction.reply({ content: `You pleaded to`+` `+u,embeds:[exampleEmbed], ephemeral: false });
-    // return interaction.reply({content: ${}})
 	},
 };

@@ -1,16 +1,4 @@
 const { SlashCommandBuilder,channelMention,userMention,roleMention } = require('discord.js');
-const { EmbedBuilder } = require('discord.js');
-
-// const exampleEmbed = new EmbedBuilder()
-// 	.setColor(0x0099FF)
-// 	.setTitle('Kicked')
-//   .setURL('https://tenor.com/bvi31.gif')
-// 	.setDescription('KO!!!!')
-//   .setImage('https://tenor.com/bvi31.gif')
-
-const { AttachmentBuilder } = require('discord.js');
-// ...
-const file = new AttachmentBuilder('../assets/discordjs.png');
 
 var arr=[
 "https://media.giphy.com/media/13HXKG2HGN8aPK/giphy.gif",

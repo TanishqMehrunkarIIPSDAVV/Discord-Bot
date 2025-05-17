@@ -1,6 +1,5 @@
 const { SlashCommandBuilder,channelMention,userMention,roleMention} = require('discord.js');
-const { EmbedBuilder } = require('discord.js');
-const {AttachmentBuilder} = require("discord.js");
+
 var arr=[
   "https://media.giphy.com/media/lDPPhStHv9Jfpem7wI/giphy.gif",
   "https://media.giphy.com/media/gOUwm7vv70UOQ/giphy.gif",
