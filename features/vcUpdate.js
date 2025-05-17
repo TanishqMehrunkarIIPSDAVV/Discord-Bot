@@ -1,7 +1,6 @@
 const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const { userMention } = require("discord.js");
-const {SpeechClient} = require("discord-speech-recognition");
 
 const roleAssign = (newState) => {
   if (newState.selfMute) {
