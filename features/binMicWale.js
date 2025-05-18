@@ -1,45 +1,25 @@
-const path=require("node:path");
-const client=require(`${path.dirname(__dirname)}/index.js`);
-const {userMention}=require("discord.js");
+const path = require("node:path");
+const client = require(`${path.dirname(__dirname)}/index.js`);
+const { userMention } = require("discord.js");
 
-const binMicWale=()=>
-{
-    client.on("messageCreate",async (message)=>
-    {
-        if(message.content.includes("[op vc]"))
-        {
-            message.content=message.content.toLowerCase();
-            const arr=
-            [
-            "956272385873571941",
-            "945064832909049876",
-            "945065033543614526",
-            "941299955459575878",
-            "941300027152826369",
-            "943437016421515284"
-            ];
-            let flag=0;
-            for(let i=0;i<arr.length;i++)
-            {
-                let cha=client.channels.cache.get(arr[i]);
-                let Mems=cha.members;
-                Mems.forEach((member)=>
-                {
-                    if(member.id===message.member.id)
-                    {
-                        flag=1;
-                    }
-                });
-                if(flag===1)
-                {
-                    Mems.forEach((member)=>
-                    {
-                        if(member.id!==message.member.id) message.channel.send(`${userMention(member.id)}`);
-                    });
-                    break;
-                }
+const binMicWale = () => {
+    client.on("messageCreate", async (message) => {
+        if (message.content.toLowerCase().startsWith("op vc")) {
+            const userVC = message.member.voice.channel;
+            if (!userVC) {
+                return message.reply("You are not in a voice channel!");
             }
+            // Ping all users in the same VC except the message author
+            const mentions = userVC.members
+                .filter(member => member.id !== message.member.id)
+                .map(member => userMention(member.id))
+                .join(" ");
+            if (mentions.length === 0) {
+                return message.reply("No one else is in your voice channel.");
+            }
+            message.channel.send(mentions);
         }
     });
-}
-module.exports=binMicWale;
+};
+
+module.exports = binMicWale;

@@ -14,94 +14,98 @@ const distube = new DisTube(client, {
 });
 
 const distubeFunc = () => {
-  let ch;
   client.on("messageCreate", async (message) => {
+    if (message.author.bot) return;
     if (message.content.startsWith("op")) {
       const prefix = "op";
       const args = message.content.slice(prefix.length).trim().split(/ +/g);
       const command = args.shift();
       const channel = message.member.voice.channel;
-      if (!channel)
-        message.channel.send("You are not connected to a voice channel!");
-      else {
-        if (!ch) ch = message.member.voice.channel;
-        if (ch !== channel) {
-          message.channel.send("I am already in a voice channel");
-        } else {
-          if (command === "play") {
-            let url = args.join(" ");
-            if (!url) {
-              message.channel.send("Gaane ka naam to de bsdk!!!");
-              return;
-            }
-            console.log(url);
-            distube
-              .play(channel, url, {
-                message,
-                textChannel: message.channel,
-                member: message.member,
-              })
-              .catch((err) => {
-                console.error(err);
-                if (
-                  err.name === "DisTubeError" &&
-                  err.message.includes("CANNOT_RESOLVE_SONG")
-                ) {
-                  message.channel.send(
-                    "Sorry, I couldn't resolve the song URL or search term."
-                  );
-                } else {
-                  message.channel.send(`Encountered an error: ${err.message}`);
-                }
-              });
-          }
-          // ...existing code...
-          else if (command === "stop") {
-            distube.stop(message);
-            message.channel.send("Stopped the queue!!!");
-          } else if (command === "pause") {
-            distube.pause(message);
-            message.channel.send("Music is paused!!!");
-          } else if (command === "resume") {
-            distube.resume(message);
-            message.channel.send("Music is on again!!!");
-          } else if (command === "repeat") {
-            let mode = distube.setRepeatMode(message, parseInt(args[0]));
-            if (!mode) {
-              message.channel.send("Specify queue or song!!!");
-              return;
-            }
-            mode = mode ? (mode == 2 ? "Repeat queue" : "Repeat song") : "Off";
-            message.channel.send("Set repeat mode to `" + mode + "`");
-          } else if (command === "shuffle") {
-            distube.shuffle(message);
-            message.channel.send("Queue is been shuffled!!!");
-          } else if (command === "skip") {
-            let stat = 0;
-            distube.skip(message).catch((err) => {
-              message.channel.send(`Error:${err}`);
-              stat = 1;
-            });
-            if (stat === 0) message.channel.send("Skipped current song!!!");
-          }
-          // ...existing code...
-          else if (command === "queue") {
-            const queue = distube.getQueue(message);
-            message.channel.send(
-              "Current queue:\n" +
-                queue.songs
-                  .map(
-                    (song, id) =>
-                      `**${id + 1}**. [${song.name}] - \`${
-                        song.formattedDuration
-                      }\``
-                  )
-                  .join("\n")
-            );
-          } 
-          else if(command === "tts" || command === "disconnect") {}
-          else message.channel.send("Invalid command!!!");
+
+      // Only require voice channel for music commands
+      const musicCommands = [
+        "play", "stop", "pause", "resume", "repeat", "shuffle", "skip", "queue"
+      ];
+
+      if (musicCommands.includes(command) && !channel) {
+        return message.channel.send("You are not connected to a voice channel!");
+      }
+
+      if (command === "play") {
+        let url = args.join(" ");
+        if (!url) {
+          message.channel.send("Gaane ka naam to de bsdk!!!");
+          return;
         }
+        console.log(url);
+        distube
+          .play(channel, url, {
+            message,
+            textChannel: message.channel,
+            member: message.member,
+          })
+          .catch((err) => {
+            console.error(err);
+            if (
+              err.name === "DisTubeError" &&
+              err.message.includes("CANNOT_RESOLVE_SONG")
+            ) {
+              message.channel.send(
+                "Sorry, I couldn't resolve the song URL or search term."
+              );
+            } else {
+              message.channel.send(`Encountered an error: ${err.message}`);
+            }
+          });
+      } else if (command === "stop") {
+        distube.stop(message);
+        message.channel.send("Stopped the queue!!!");
+      } else if (command === "pause") {
+        distube.pause(message);
+        message.channel.send("Music is paused!!!");
+      } else if (command === "resume") {
+        distube.resume(message);
+        message.channel.send("Music is on again!!!");
+      } else if (command === "repeat") {
+        let mode = distube.setRepeatMode(message, parseInt(args[0]));
+        if (!mode) {
+          message.channel.send("Specify queue or song!!!");
+          return;
+        }
+        mode = mode ? (mode == 2 ? "Repeat queue" : "Repeat song") : "Off";
+        message.channel.send("Set repeat mode to `" + mode + "`");
+      } else if (command === "shuffle") {
+        distube.shuffle(message);
+        message.channel.send("Queue is been shuffled!!!");
+      } else if (command === "skip") {
+        let stat = 0;
+        distube.skip(message).catch((err) => {
+          message.channel.send(`Error:${err}`);
+          stat = 1;
+        });
+        if (stat === 0) message.channel.send("Skipped current song!!!");
+      } else if (command === "queue") {
+        const queue = distube.getQueue(message);
+        if (!queue || !queue.songs || queue.songs.length === 0) {
+          return message.channel.send("Queue is empty!");
+        }
+        message.channel.send(
+          "Current queue:\n" +
+            queue.songs
+              .map(
+                (song, id) =>
+                  `**${id + 1}**. [${song.name}] - \`${song.formattedDuration}\``
+              )
+              .join("\n")
+        );
+      } else if (
+        command === "tts" ||
+        command === "disconnect" ||
+        command === "vc"
+      ) {
+        // handled elsewhere
+      } else {
+        message.channel.send("Invalid command!!!");
       }
     }
   });
@@ -118,9 +122,7 @@ const distubeFunc = () => {
   distube
     .on("playSong", (queue, song) =>
       queue.textChannel?.send(
-        `Playing \`${song.name}\` - \`${
-          song.formattedDuration
-        }\`\nRequested by: ${song.user}\n${status(queue)}`
+        `Playing \`${song.name}\` - \`${song.formattedDuration}\`\nRequested by: ${song.user}\n${status(queue)}`
       )
     )
     .on("addSong", (queue, song) =>
@@ -130,9 +132,7 @@ const distubeFunc = () => {
     )
     .on("addList", (queue, playlist) =>
       queue.textChannel?.send(
-        `Added \`${playlist.name}\` playlist (${
-          playlist.songs.length
-        } songs) to queue\n${status(queue)}`
+        `Added \`${playlist.name}\` playlist (${playlist.songs.length} songs) to queue\n${status(queue)}`
       )
     )
     .on("error", (e, textChannel) => {
@@ -157,7 +157,6 @@ const distubeFunc = () => {
           .join("\n")}\n*Enter anything else or wait 30 seconds to cancel*`
       );
     })
-
     .on("searchDone", (message, answer, result) => {
       const song = result[answer - 1]; // Get the selected song from result
       if (!song) {
@@ -166,11 +165,11 @@ const distubeFunc = () => {
       }
       distube.play(message.member.voice.channel, song.url, { message });
     })
-
     .on("searchCancel", (message) => message.channel.send("Search canceled."))
     .on("searchNoResult", (message) => message.channel.send("No result found."))
     .on("searchInvalidAnswer", (message) =>
       message.channel.send("Invalid selection.")
     );
 };
+
 module.exports = distubeFunc;

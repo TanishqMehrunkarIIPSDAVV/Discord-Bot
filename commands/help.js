@@ -1,6 +1,4 @@
-const path = require("node:path");
-const client = require(`${path.dirname(__dirname)}/index.js`);
-const { userMention, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 
 const helpPages = [
     new EmbedBuilder()
@@ -47,51 +45,59 @@ const helpPages = [
         .setFooter({ text: "Use the ⏮️ Previous and ⏭️ Next buttons to navigate pages!" }),
 ];
 
-const help = () => {
-    client.on("messageCreate", async (message) => {
-        if (message.author.bot) return;
-        if (message.content.includes(`${userMention("1080879295586643978")}`)) {
-            let page = 0;
-            const getRow = (page) => new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId("prev")
-                    .setLabel("⏮️ Previous")
-                    .setStyle(ButtonStyle.Secondary)
-                    .setDisabled(page === 0),
-                new ButtonBuilder()
-                    .setCustomId("next")
-                    .setLabel("Next ⏭️")
-                    .setStyle(ButtonStyle.Primary)
-                    .setDisabled(page === helpPages.length - 1),
-                new ButtonBuilder()
-                    .setCustomId("close")
-                    .setLabel("❌ Close")
-                    .setStyle(ButtonStyle.Danger)
-            );
-            const sent = await message.channel.send({ embeds: [helpPages[page]], components: [getRow(page)] });
+function getRow(page) {
+    return new ActionRowBuilder().addComponents(
+        new ButtonBuilder()
+            .setCustomId("prev")
+            .setLabel("⏮️ Previous")
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(page === 0),
+        new ButtonBuilder()
+            .setCustomId("next")
+            .setLabel("Next ⏭️")
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(page === helpPages.length - 1),
+        new ButtonBuilder()
+            .setCustomId("close")
+            .setLabel("❌ Close")
+            .setStyle(ButtonStyle.Danger)
+    );
+}
 
-            const collector = sent.createMessageComponentCollector({ time: 120000 });
+module.exports = {
+    data: new SlashCommandBuilder()
+        .setName('help')
+        .setDescription('Show all bot commands and features!'),
+    async execute(interaction) {
+        let page = 0;
+        const sent = await interaction.reply({
+            embeds: [helpPages[page]],
+            components: [getRow(page)],
+            ephemeral: true
+        });
 
-            collector.on("collect", async (i) => {
-                if (i.user.id !== message.author.id) {
-                    return i.reply({ content: "Only you can use these buttons for your help menu.", ephemeral: true });
-                }
-                if (i.customId === "next" && page < helpPages.length - 1) page++;
-                if (i.customId === "prev" && page > 0) page--;
-                if (i.customId === "close") {
-                    collector.stop();
-                    return await i.update({ content: "Help menu closed.", embeds: [], components: [] });
-                }
-                await i.update({ embeds: [helpPages[page]], components: [getRow(page)] });
-            });
+        const msg = await interaction.fetchReply();
+        const collector = msg.createMessageComponentCollector({ time: 120000 });
 
-            collector.on("end", async () => {
-                try {
-                    await sent.edit({ components: [] });
-                } catch (e) {}
-            });
-        }
-    });
+        collector.on("collect", async (i) => {
+            if (i.user.id !== interaction.user.id) {
+                return i.reply({ content: "Only you can use these buttons for your help menu.", ephemeral: true });
+            }
+            if (i.customId === "next" && page < helpPages.length - 1) page++;
+            if (i.customId === "prev" && page > 0) page--;
+            if (i.customId === "close") {
+                collector.stop();
+                return await i.update({ content: "Help menu closed.", embeds: [], components: [] });
+            }
+            await i.update({ embeds: [helpPages[page]], components: [getRow(page)] });
+        });
+
+        collector.on("end", async () => {
+            try {
+                const disabledRow = getRow(page);
+                disabledRow.components.forEach(btn => btn.setDisabled(true));
+                await msg.edit({ components: [disabledRow] });
+            } catch (e) {}
+        });
+    }
 };
-
-module.exports = help;
