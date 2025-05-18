@@ -4,7 +4,7 @@ const helpPages = [
     new EmbedBuilder()
         .setColor("#5865F2")
         .setTitle("🤖 Bot Help - Page 1 / 2")
-        .setThumbnail("https://cdn-icons-png.flaticon.com/512/4712/4712035.png")
+        .setThumbnail("https://res.cloudinary.com/dlvoithw3/image/upload/v1747582675/a4c4f7d0e2f8bb9d50df90d0c114646f_qod2s6.webp")
         .setDescription(
             `👋 **Hi! Need help? Here are my features:**\n\n` +
             `**1.** <Tag me> or </help:>: Show all commands ⁉️\n` +
@@ -26,7 +26,7 @@ const helpPages = [
     new EmbedBuilder()
         .setColor("#5865F2")
         .setTitle("🤖 Bot Help - Page 2 / 2")
-        .setThumbnail("https://cdn-icons-png.flaticon.com/512/4712/4712035.png")
+        .setThumbnail("https://res.cloudinary.com/dlvoithw3/image/upload/v1747582675/a4c4f7d0e2f8bb9d50df90d0c114646f_qod2s6.webp")
         .setDescription(
             `**15.** \`op pause\`: Pause song queue ⏸️\n` +
             `**16.** \`op resume\`: Resume song queue ▶️\n` +
