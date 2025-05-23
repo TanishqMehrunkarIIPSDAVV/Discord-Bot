@@ -56,5 +56,7 @@ const help=require("./features/help");
 help();
 const tts=require("./features/tts");
 tts();
+const welcome=require("./features/welcome");
+welcome();
 client.login(token);
 console.log('tested');
