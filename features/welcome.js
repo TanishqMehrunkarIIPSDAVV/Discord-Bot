@@ -4,7 +4,7 @@ const { userMention, EmbedBuilder } = require("discord.js");
 
 const welcome = () => {
     client.on("guildMemberAdd", async (member) => {
-        const channel = member.guild.channels.cache.get('939538672460627978');
+        const channel = member.guild.channels.cache.get('1439533068208570420');
         if (!channel) return;
 
         const embed = new EmbedBuilder()
@@ -22,7 +22,7 @@ const welcome = () => {
     });
 
     client.on("guildMemberRemove", async (member) => {
-        const channel = member.guild.channels.cache.get('946809289106935808');
+        const channel = member.guild.channels.cache.get('1439550592090505216');
         if (!channel) return;
 
         const embed = new EmbedBuilder()

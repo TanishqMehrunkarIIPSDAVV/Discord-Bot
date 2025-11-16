@@ -28,7 +28,7 @@ const roleAssign = (newState) => {
 
 const vcUpdate = () => {
   client.on("voiceStateUpdate", (oldState, newState) => {
-    const ch = client.channels.cache.get("962590186598989824");
+    const ch = client.channels.cache.get("940160929864241245");
     if (oldState.channelId === null) {
       ch.send(`${userMention(newState.id)} joined the VC`);
       roleAssign(newState);

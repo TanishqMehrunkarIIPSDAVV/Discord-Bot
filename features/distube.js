@@ -104,8 +104,6 @@ const distubeFunc = () => {
         command === "vc"
       ) {
         // handled elsewhere
-      } else {
-        message.channel.send("Invalid command!!!");
       }
     }
   });

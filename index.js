@@ -30,24 +30,48 @@ for (const file of commandFiles)
   client.commands.set(command.data.name, command);
 }
 
+client.on('interactionCreate', async (interaction) => {
+    if (!interaction.isChatInputCommand()) return;
+
+    const command = client.commands.get(interaction.commandName);
+
+    if (!command) {
+        console.error(`No command matching ${interaction.commandName} was found.`);
+        return;
+    }
+
+    try {
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(`Error while executing /${interaction.commandName}:`, error);
+        const errorReply = { content: 'There was an error while executing this command.', ephemeral: true };
+
+        if (interaction.deferred || interaction.replied) {
+            await interaction.followUp(errorReply).catch(() => {});
+        } else {
+            await interaction.reply(errorReply).catch(() => {});
+        }
+    }
+});
+
 startServer();
 module.exports=client;
 const binMicWale=require("./features/binMicWale");
 binMicWale();
-const bump=require("./features/bump");
-bump();
+//const bump=require("./features/bump");
+//bump();
 const distubeFunc=require("./features/distube");
 distubeFunc();
-const interactionFunc=require("./features/interaction");
-interactionFunc();
-const naam=require("./features/naam");
-naam();
+//const naam=require("./features/naam");
+//naam();
 const onReady=require("./features/onReady");
 onReady();
 const pingPong=require("./features/pingPong");
 pingPong();
 const spam=require("./features/spam");
 spam();
+const member = require("./features/member");
+member();
 // const speech=require("./features/speech");
 // speech();
 const vcUpdate=require("./features/vcUpdate");
@@ -58,5 +82,9 @@ const tts=require("./features/tts");
 tts();
 const welcome=require("./features/welcome");
 welcome();
+const kick = require("./features/kick");
+kick();
+const ban = require("./features/ban");
+ban();
 client.login(token);
 console.log('tested');
