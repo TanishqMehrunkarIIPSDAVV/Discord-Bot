@@ -3,7 +3,7 @@
 const {token} = require("./config.json");
 const fs = require('node:fs');
 const path = require('node:path');
-const { Client, Collection,GatewayIntentBits} = require('discord.js');
+const { Client, Collection,GatewayIntentBits,Partials} = require('discord.js');
 const startServer=require("./server");
 
 const client = new Client(
@@ -14,8 +14,16 @@ const client = new Client(
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildVoiceStates
-    ]
+        GatewayIntentBits.GuildVoiceStates,
+        GatewayIntentBits.GuildMessageReactions
+    ],
+    partials: [
+    Partials.Message,
+    Partials.Channel,
+    Partials.Reaction,
+    Partials.User,
+    Partials.GuildMember
+  ]
 });
 
 client.commands = new Collection();
@@ -86,5 +94,7 @@ const kick = require("./features/kick");
 kick();
 const ban = require("./features/ban");
 ban();
+const messageLogs = require("./features/messageLogs");
+messageLogs();
 client.login(token);
 console.log('tested');
