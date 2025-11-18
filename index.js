@@ -96,5 +96,7 @@ const ban = require("./features/ban");
 ban();
 const messageLogs = require("./features/messageLogs");
 messageLogs();
+const vanity = require("./features/vanity");
+vanity();
 client.login(token);
 console.log('tested');
