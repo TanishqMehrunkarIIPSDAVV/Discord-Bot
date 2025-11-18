@@ -42,7 +42,9 @@ const helpPages = [
             `**24.** \`ping\`: Replies with pong! 🏓\n` +
             `**25.** \`pong\`: Replies with ping! 🏓\n` +
             `**26.** \`op tts\`: Speak text in VC 🎤\n` +
-            `**27.** \`op disconnect\`: Disconnect bot from VC ❌\n`
+            `**27.** \`op disconnect\`: Disconnect bot from VC ❌\n` +
+            `**28.** \`op kick [userid or mention user] [reason: optional]\`: Kick a User from Server\n`+
+            `**29.** \`op ban [userid or mention user] [reason: optional]\`: Ban a User from Server\n`
         )
         .setFooter({ text: "Use the ⏮️ Previous and ⏭️ Next buttons to navigate pages!" }),
 ];
