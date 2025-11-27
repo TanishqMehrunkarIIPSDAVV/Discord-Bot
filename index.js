@@ -98,5 +98,7 @@ const messageLogs = require("./features/messageLogs");
 messageLogs();
 const vanity = require("./features/vanity");
 vanity();
+const move = require("./features/move");
+move();
 client.login(token);
 console.log('tested');

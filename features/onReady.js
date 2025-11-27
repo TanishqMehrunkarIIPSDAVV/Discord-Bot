@@ -7,7 +7,7 @@ const onReady=()=>
 {
     client.on(Events.ClientReady, () =>
     {
-        client.user.setActivity("over ŒFFĪÇÍÆL PRÍMÊ Server",
+        client.user.setActivity("Watching over ŒFFĪÇÍÆL PRÍMÊ Server",
         {
           type: ActivityType.Watching,
         });

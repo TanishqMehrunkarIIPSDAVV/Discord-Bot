@@ -7,7 +7,7 @@ const vanity=()=>{
         const content = String(msg.content).toLowerCase();
         if(content === "vanity" || content.includes("perm"))
         {
-            msg.channel.send("https://discord.gg/EDBaF2EGBP\nPut this Link in your Bio !!!").catch(()=>{});
+            msg.channel.send("https://discord.gg/officialprime\nPut this Link in your Bio !!!").catch(()=>{});
         }
     });
 };
