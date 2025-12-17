@@ -7,7 +7,7 @@ const onReady=()=>
 {
     client.on(Events.ClientReady, () =>
     {
-        client.user.setActivity("Watching over ŒFFĪÇÍÆL PRÍMÊ Server",
+        client.user.setActivity("Serving 𝑪𝒉𝒂𝒊 𝑻𝒂𝒑𝒓𝒊.𝒆𝒙𝒆 Server",
         {
           type: ActivityType.Watching,
         });
