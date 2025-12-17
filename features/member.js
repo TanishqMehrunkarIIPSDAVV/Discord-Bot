@@ -2,7 +2,7 @@ const path=require("node:path");
 const client=require(`${path.dirname(__dirname)}/index.js`);
 const member=()=>
 {
-    const roleName = "𝐎𝐅𝐅𝐈𝐂𝐈𝐀𝐋𝐒";
+    const roleName = "𝐁𝐈𝐒𝐂𝐔𝐈𝐓𝐒";
 
     client.on("guildMemberAdd", async (member) => {
         const role = member.guild.roles.cache.find(r => r.name === roleName);

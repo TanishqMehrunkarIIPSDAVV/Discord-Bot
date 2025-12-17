@@ -1,10 +1,11 @@
+const path = require('node:path');
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require('discord.js');
 
 const helpPages = [
     new EmbedBuilder()
         .setColor("#5865F2")
         .setTitle("🤖 Bot Help - Page 1 / 2")
-        .setThumbnail("https://res.cloudinary.com/dlvoithw3/image/upload/v1747582675/a4c4f7d0e2f8bb9d50df90d0c114646f_qod2s6.webp")
+        .setThumbnail('attachment://thumbnail.jpg')
         .setDescription(
             `👋 **Hi! Need help? Here are my features:**\n\n` +
             `**1.** <Tag me> or </help:>: Show all commands ⁉️\n` +
@@ -26,7 +27,7 @@ const helpPages = [
     new EmbedBuilder()
         .setColor("#5865F2")
         .setTitle("🤖 Bot Help - Page 2 / 2")
-        .setThumbnail("https://res.cloudinary.com/dlvoithw3/image/upload/v1747582675/a4c4f7d0e2f8bb9d50df90d0c114646f_qod2s6.webp")
+        .setThumbnail('attachment://thumbnail.jpg')
         .setDescription(
             `**15.** \`op pause\`: Pause song queue ⏸️\n` +
             `**16.** \`op resume\`: Resume song queue ▶️\n` +
@@ -72,9 +73,11 @@ module.exports = {
         .setDescription('Show all bot commands and features!'),
     async execute(interaction) {
         let page = 0;
+        const thumbnailPath = path.join(__dirname, '..', 'assets', 'thumbnail.jpg');
         const sent = await interaction.reply({
             embeds: [helpPages[page]],
             components: [getRow(page)],
+            files: [{ attachment: thumbnailPath, name: 'thumbnail.jpg' }],
             ephemeral: true
         });
 
