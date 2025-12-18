@@ -4,7 +4,7 @@ const { userMention } = require("discord.js");
 
 const binMicWale = () => {
     client.on("messageCreate", async (message) => {
-        if (message.content.toLowerCase().startsWith("op vc")) {
+        if (message.content.toLowerCase().startsWith("ct vc")) {
             const userVC = message.member.voice.channel;
             if (!userVC) {
                 return message.reply("You are not in a voice channel!");

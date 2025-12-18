@@ -5,9 +5,9 @@ const { userMention, PermissionFlagsBits } = require("discord.js");
 const kick = () => {
   client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
-    if (!message.content.toLowerCase().startsWith("op kick")) return;
+    if (!message.content.toLowerCase().startsWith("ct kick")) return;
 
-    const prefix = "op";
+    const prefix = "ct";
     const parts = message.content.slice(prefix.length).trim().split(/ +/g);
     parts.shift();
     const targetArg = parts.shift();

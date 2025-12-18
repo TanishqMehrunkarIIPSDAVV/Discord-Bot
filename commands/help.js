@@ -19,9 +19,9 @@ const helpPages = [
             `**9.** </server:>: Server info 📰\n` +
             `**10.** </slap:>: Slap a user 🤚\n` +
             `**11.** </user:>: When you joined ❔\n` +
-            `**12.** \`op vc\`: Ping everyone in VC 🍭\n` +
-            `**13.** \`op play\`: Play/add song in VC 🎵\n` +
-            `**14.** \`op stop\`: Stop song queue 🛑\n`
+            `**12.** \`ct vc\`: Ping everyone in VC 🍭\n` +
+            `**13.** \`ct play\`: Play/add song in VC 🎵\n` +
+            `**14.** \`ct stop\`: Stop song queue 🛑\n`
         )
         .setFooter({ text: "Use the ⏭️ Next and ⏮️ Previous buttons to navigate pages!" }),
     new EmbedBuilder()
@@ -29,21 +29,18 @@ const helpPages = [
         .setTitle("🤖 Bot Help - Page 2 / 2")
         .setThumbnail('attachment://thumbnail.jpg')
         .setDescription(
-            `**15.** \`op pause\`: Pause song queue ⏸️\n` +
-            `**16.** \`op resume\`: Resume song queue ▶️\n` +
-            `**17.** \`op repeat\`: Set repeat mode 🔁\n` +
-            `**18.** \`op shuffle\`: Shuffle queue 🔀\n` +
-            `**19.** \`op skip\`: Skip current song ⏭️\n` +
-            `**20.** \`op queue\`: Show song queue 🎶\n` +
-            `**21.** \`brawl/brawlhalla\`: Ping brawlhalla role 🎮\n` +
-            `**22.** \`valorant/valo/valorand\`: Ping valorant role 🎮\n` +
-            `**23.** \`vc\`: Ping VC role 🎮\n` +
-            `**24.** \`ping\`: Replies with pong! 🏓\n` +
-            `**25.** \`pong\`: Replies with ping! 🏓\n` +
-            `**26.** \`op tts\`: Speak text in VC 🎤\n` +
-            `**27.** \`op disconnect\`: Disconnect bot from VC ❌\n`+
-            `**28.** \`op kick [userid or mention user] [reason: optional]\`: Kick a User from Server\n`+
-            `**29.** \`op ban [userid or mention user] [reason: optional]\`: Ban a User from Server\n`
+            `**15.** \`ct pause\`: Pause song queue ⏸️\n` +
+            `**16.** \`ct resume\`: Resume song queue ▶️\n` +
+            `**17.** \`ct repeat\`: Set repeat mode 🔁\n` +
+            `**18.** \`ct shuffle\`: Shuffle queue 🔀\n` +
+            `**19.** \`ct skip\`: Skip current song ⏭️\n` +
+            `**20.** \`ct queue\`: Show song queue 🎶\n` +
+            `**21.** \`ping\`: Replies with pong! 🏓\n` +
+            `**22.** \`pong\`: Replies with ping! 🏓\n` +
+            `**23.** \`ct tts\`: Speak text in VC 🎤\n` +
+            `**24.** \`ct disconnect\`: Disconnect bot from VC ❌\n`+
+            `**25.** \`ct kick [userid or mention user] [reason: optional]\`: Kick a User from Server\n`+
+            `**26.** \`ct ban [userid or mention user] [reason: optional]\`: Ban a User from Server\n`
         )
         .setFooter({ text: "Use the ⏮️ Previous and ⏭️ Next buttons to navigate pages!" }),
 ];

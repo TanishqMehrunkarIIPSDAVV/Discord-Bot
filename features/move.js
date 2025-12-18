@@ -7,10 +7,10 @@ const move = () => {
   client.on("messageCreate", async (message) => {
     if (message.author.bot || !message.guild) return;
 
-    const prefix = "op";
+    const prefix = "ct";
     if (!message.content.toLowerCase().startsWith(prefix)) return;
 
-    // Remove prefix: "op move duo vc 2 afk vc" -> "move duo vc 2 afk vc"
+    // Remove prefix: "ct move duo vc 2 afk vc" -> "move duo vc 2 afk vc"
     const withoutPrefix = message.content.slice(prefix.length).trim();
     const parts = withoutPrefix.split(/\s+/); // ["move","duo","vc","2","afk","vc"]
     const subcommand = parts.shift();
@@ -18,8 +18,8 @@ const move = () => {
 
     if (parts.length < 2) {
       return message.reply(
-        "Usage: `op move <fromChannel> <toChannel>`\n" +
-        "Example: `op move duo vc 2 afk vc`"
+        "Usage: `ct move <fromChannel> <toChannel>`\n" +
+        "Example: `ct move duo vc 2 afk vc`"
       );
     }
 

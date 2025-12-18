@@ -16,8 +16,8 @@ const distube = new DisTube(client, {
 const distubeFunc = () => {
   client.on("messageCreate", async (message) => {
     if (message.author.bot) return;
-    if (message.content.startsWith("op")) {
-      const prefix = "op";
+    if (message.content.startsWith("ct")) {
+      const prefix = "ct";
       const args = message.content.slice(prefix.length).trim().split(/ +/g);
       const command = args.shift();
       const channel = message.member.voice.channel;

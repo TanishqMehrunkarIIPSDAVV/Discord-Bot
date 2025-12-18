@@ -5,7 +5,7 @@ const googleTTS = require('google-tts-api'); // No API key needed
 
 const tts = ()=>{
     client.on('messageCreate', async (message) => {
-        if (message.content.startsWith('op tts')) {
+        if (message.content.startsWith('ct tts')) {
             const text = message.content.slice(7);
             if (text.length === 0) return message.reply('Please provide some text to convert to speech.');
             if (text.length > 200) return message.reply('Text is too long. Please limit it to 200 characters.');
@@ -16,7 +16,7 @@ const tts = ()=>{
             await speakInVC(voiceChannel, text, message.member.user.username);
         }
 
-        if(message.content === "op disconnect") {
+        if(message.content === "ct disconnect") {
             const voiceChannel = message.member.voice.channel;
             if (!voiceChannel) {
                 return message.reply('Join a voice channel first!');
