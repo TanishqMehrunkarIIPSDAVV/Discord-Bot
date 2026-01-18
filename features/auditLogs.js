@@ -338,9 +338,9 @@ const auditLogs = () => {
 
       let message = "";
       if (!oldState.channelId && newState.channelId) {
-        message = `${userMention(userId)} has joined the VC to ${newState.channel.name}`;
+        message = `${userMention(userId)} has joined ${newState.channel.name}`;
       } else if (oldState.channelId && !newState.channelId) {
-        message = `${userMention(userId)} has left the VC from ${oldState.channel.name}`;
+        message = `${userMention(userId)} has left ${oldState.channel.name}`;
       } else if (oldState.channelId !== newState.channelId) {
         message = `${userMention(userId)} has moved from ${oldState.channel.name} to ${newState.channel.name}`;
       } else {
