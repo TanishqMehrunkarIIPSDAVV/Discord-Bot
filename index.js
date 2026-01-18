@@ -26,6 +26,9 @@ const client = new Client(
   ]
 });
 
+// Allow many feature modules to attach their own listeners without warnings
+client.setMaxListeners(0);
+
 client.commands = new Collection();
 
 const commandsPath = path.join(__dirname, 'commands');
@@ -94,6 +97,14 @@ const kick = require("./features/kick");
 kick();
 const ban = require("./features/ban");
 ban();
+const mute = require("./features/mute");
+mute();
+const unmute = require("./features/unmute");
+unmute();
+const unban = require("./features/unban");
+unban();
+const auditLogs = require("./features/auditLogs");
+auditLogs();
 const messageLogs = require("./features/messageLogs");
 messageLogs();
 const vanity = require("./features/vanity");

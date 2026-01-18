@@ -4,43 +4,48 @@ const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, Embed
 const helpPages = [
     new EmbedBuilder()
         .setColor("#5865F2")
-        .setTitle("🤖 Bot Help - Page 1 / 2")
+        .setTitle("🤖 Help • Basics (1/3)")
         .setThumbnail('attachment://thumbnail.jpg')
         .setDescription(
-            `👋 **Hi! Need help? Here are my features:**\n\n` +
-            `**1.** <Tag me> or </help:>: Show all commands ⁉️\n` +
-            `**2.** </ping:>: Show bot ping 🏓\n` +
-            `**3.** </avatar:>: Show user avatar 🔎\n` +
-            `**4.** </die:>: Kill yourself 😎\n` +
-            `**5.** </kick:>: Kick a user [Not really] 🦵\n` +
-            `**6.** </plead:>: Plead to a user 🙏\n` +
-            `**7.** </prune:>: Delete multiple messages 🕵️\n` +
-            `**8.** </punch:>: Punch a user 👊\n` +
-            `**9.** </server:>: Server info 📰\n` +
-            `**10.** </slap:>: Slap a user 🤚\n` +
-            `**11.** </user:>: When you joined ❔\n` +
-            `**12.** \`ct vc\`: Ping everyone in VC 🍭\n` +
-            `**13.** \`ct play\`: Play/add song in VC 🎵\n` +
-            `**14.** \`ct stop\`: Stop song queue 🛑\n`
+            `👋 **Quick start:** Mention me or type \`ct help\` to open this menu.\n\n` +
+            `**1.** </help:> / mention bot: Open help menu 📚\n` +
+            `**2.** </ping:>: Bot latency 🏓\n` +
+            `**3.** </avatar:>: View avatars 🔎\n` +
+            `**4.** </user:>: User info (joined at) 🧾\n` +
+            `**5.** </server:>: Server info 📰\n` +
+            `**6.** </prune:>: Bulk delete 1-99 msgs 🧹\n` +
+            `**7.** \`ping\` / \`pong\`: Text ping-pong fun 🎯\n` +
+            `**8.** \`ct vc\`: Ping everyone in your VC 🍭\n`
         )
         .setFooter({ text: "Use the ⏭️ Next and ⏮️ Previous buttons to navigate pages!" }),
     new EmbedBuilder()
         .setColor("#5865F2")
-        .setTitle("🤖 Bot Help - Page 2 / 2")
+        .setTitle("🤖 Help • Moderation (2/3)")
         .setThumbnail('attachment://thumbnail.jpg')
         .setDescription(
-            `**15.** \`ct pause\`: Pause song queue ⏸️\n` +
-            `**16.** \`ct resume\`: Resume song queue ▶️\n` +
-            `**17.** \`ct repeat\`: Set repeat mode 🔁\n` +
-            `**18.** \`ct shuffle\`: Shuffle queue 🔀\n` +
-            `**19.** \`ct skip\`: Skip current song ⏭️\n` +
-            `**20.** \`ct queue\`: Show song queue 🎶\n` +
-            `**21.** \`ping\`: Replies with pong! 🏓\n` +
-            `**22.** \`pong\`: Replies with ping! 🏓\n` +
-            `**23.** \`ct tts\`: Speak text in VC 🎤\n` +
-            `**24.** \`ct disconnect\`: Disconnect bot from VC ❌\n`+
-            `**25.** \`ct kick [userid or mention user] [reason: optional]\`: Kick a User from Server\n`+
-            `**26.** \`ct ban [userid or mention user] [reason: optional]\`: Ban a User from Server\n`
+            `**9.** \`ct kick <user> [reason]\`: Kick user (with DMs) 🦵\n` +
+            `**10.** \`ct ban <user> [reason]\`: Ban user/ID 🔨\n` +
+            `**11.** \`ct unban <userId> [reason]\`: Lift a ban 🔓\n` +
+            `**12.** \`ct mute <user> [minutes] [reason]\`: Timeout user ⏱️\n` +
+            `**13.** \`ct unmute <user> [reason]\`: Remove timeout 🟢\n` +
+            `**14.** </prune:>: Bulk delete (repeat) 🧹\n` +
+            `**15.** Automations: message delete logs, welcome/leave, VC mute-role sync ⚙️\n`
+        )
+        .setFooter({ text: "Use the ⏮️ Previous and ⏭️ Next buttons to navigate pages!" }),
+    new EmbedBuilder()
+        .setColor("#5865F2")
+        .setTitle("🤖 Help • Voice & Music (3/3)")
+        .setThumbnail('attachment://thumbnail.jpg')
+        .setDescription(
+            `**16.** \`ct play <query/url>\`: Play/add song 🎵\n` +
+            `**17.** \`ct stop\`: Stop/clear queue 🛑\n` +
+            `**18.** \`ct pause\` / \`ct resume\`: Pause/Resume ⏯️\n` +
+            `**19.** \`ct repeat\`: Repeat mode 🔁\n` +
+            `**20.** \`ct shuffle\`: Shuffle queue 🔀\n` +
+            `**21.** \`ct skip\`: Skip current song ⏭️\n` +
+            `**22.** \`ct queue\`: Show queue 🎶\n` +
+            `**23.** \`ct tts <text>\`: Speak in VC 🎤\n` +
+            `**24.** \`ct disconnect\`: Disconnect bot ❌\n`
         )
         .setFooter({ text: "Use the ⏮️ Previous and ⏭️ Next buttons to navigate pages!" }),
 ];

@@ -7,6 +7,7 @@ const messageContents = new Map();
 
 const spam = () => {
     client.on("messageCreate", async (message) => {
+        if(message.channel.id === "1439573831831392428") return;
         if (message.author.bot) return;
 
         const now = Date.now();
@@ -33,8 +34,10 @@ const spam = () => {
         // Check for repeated content (e.g., 4+ identical messages in a row)
         const repeated = contents.length >= 4 && contents.slice(-4).every(c => c === contents[contents.length - 1]);
 
-        // Check for too many messages in 10 seconds AND repeated content
-        if (filteredTimestamps.length > 5 && repeated) {
+        // Check for either repeated content OR too many messages in 10 seconds
+        const tooManyInWindow = filteredTimestamps.length > 5;
+
+        if (repeated || tooManyInWindow) {
             try {
                 await message.member.timeout(60000, "Spamming detected");
                 await message.channel.send(`${userMention(userId)} has been timed out for spamming.`);

@@ -2,41 +2,37 @@ const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const { userMention } = require("discord.js");
 
-const roleAssign = (newState) => {
-  if (newState.selfMute) {
-    const role = newState.guild.roles.cache.find(
-      (role) => role.name === "Bin Mic Wale"
-    );
-    if (role) {
-      const member = newState.guild.members.cache.get(newState.id);
-      if (member) {
-        member.roles.add(role).catch(console.error);
-      }
-    }
-  } else {
-    const role = newState.guild.roles.cache.find(
-      (role) => role.name === "Bin Mic Wale"
-    );
-    if (role) {
-      const member = newState.guild.members.cache.get(newState.id);
-      if (member) {
-        member.roles.remove(role).catch(console.error);
-      }
-    }
-  }
+const getRole = (guild) => guild.roles.cache.find((r) => r.name === "Bin Mic Wale");
+
+const addRole = (state) => {
+  const role = getRole(state.guild);
+  const member = role && state.guild.members.cache.get(state.id);
+  if (role && member) member.roles.add(role).catch(console.error);
+};
+
+const removeRole = (state) => {
+  const role = getRole(state.guild);
+  const member = role && state.guild.members.cache.get(state.id);
+  if (role && member) member.roles.remove(role).catch(console.error);
 };
 
 const vcUpdate = () => {
   client.on("voiceStateUpdate", (oldState, newState) => {
-    const ch = client.channels.cache.get("940160929864241245");
     if (oldState.channelId === null) {
-      ch.send(`${userMention(newState.id)} joined the VC`);
-      roleAssign(newState);
+      if (newState.selfMute) {
+        addRole(newState);
+      } else {
+        removeRole(newState);
+      }
     } else if (newState.channelId === null) {
-      ch.send(`${userMention(oldState.id)} left the VC`);
-      roleAssign(oldState);
+      // Always remove the role on disconnect, even if they left while muted
+      removeRole(oldState);
     } else if (oldState.selfMute !== newState.selfMute) {
-      roleAssign(newState);
+      if (newState.selfMute) {
+        addRole(newState);
+      } else {
+        removeRole(newState);
+      }
     }
   });
 };
