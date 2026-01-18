@@ -205,11 +205,14 @@ const auditLogs = () => {
     }
   });
 
+  // Helper to skip logging log channels
+  const isLogChannel = (channelId) => Object.values(logIds).includes(channelId) || channelId === sharedFallback;
+
   // Channels
   client.on("channelCreate", async (channel) => {
     try {
       if (!channel.guild) return;
-      if (channel.id === logChannelId) return;
+      if (isLogChannel(channel.id)) return;
       const embed = new EmbedBuilder()
         .setColor("#22C55E")
         .setTitle("📁 Channel Created")
@@ -226,7 +229,7 @@ const auditLogs = () => {
   client.on("channelDelete", async (channel) => {
     try {
       if (!channel.guild) return;
-      if (channel.id === logChannelId) return;
+      if (isLogChannel(channel.id)) return;
       const embed = new EmbedBuilder()
         .setColor("#EF4444")
         .setTitle("🗑️ Channel Deleted")
@@ -243,7 +246,7 @@ const auditLogs = () => {
   client.on("channelUpdate", async (oldChannel, newChannel) => {
     try {
       if (!newChannel.guild) return;
-      if (newChannel.id === logChannelId) return;
+      if (isLogChannel(newChannel.id)) return;
       const changes = [];
       if (oldChannel.name !== newChannel.name) changes.push(`Name: ${oldChannel.name} → ${newChannel.name}`);
       if ("rateLimitPerUser" in newChannel && oldChannel.rateLimitPerUser !== newChannel.rateLimitPerUser) {
