@@ -59,6 +59,14 @@ const ban = () => {
       // Ban user by ID directly
       await message.guild.members.ban(targetId, { reason });
 
+      // Fetch the banned user and emit guildBanAdd event for logging
+      try {
+        const bannedUser = await client.users.fetch(targetId);
+        client.emit('guildBanAdd', { user: bannedUser, guild: message.guild, reason });
+      } catch (e) {
+        console.error('Could not emit guildBanAdd:', e);
+      }
+
       message.channel.send(`${userMention(targetId)} has been banned. Reason: ${reason}`);
     } catch (err) {
       console.error("Ban error:", err);

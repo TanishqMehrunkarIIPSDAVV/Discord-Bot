@@ -28,6 +28,15 @@ const unban = () => {
 
     try {
       await message.guild.members.unban(id, reason);
+
+      // Fetch the unbanned user and emit guildBanRemove event for logging
+      try {
+        const unbannedUser = await client.users.fetch(id);
+        client.emit('guildBanRemove', { user: unbannedUser, guild: message.guild });
+      } catch (e) {
+        console.error('Could not emit guildBanRemove:', e);
+      }
+
       message.channel.send(`${userMention(id)} has been unbanned. Reason: ${reason}`);
     } catch (err) {
       console.error("Unban error:", err);
