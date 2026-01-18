@@ -62,16 +62,38 @@ const auditLogs = () => {
     }
   };
 
-  const getExecutor = async (guild, actionType) => {
+  const formatExecutor = (guild, executor) => {
+    if (!executor) return "Unknown";
+    const botId = guild?.members?.me?.id || client.user?.id;
+    if (botId && executor.id === botId) {
+      const tag = client.user?.tag || "Bot";
+      return `${tag} (Bot) (${userMention(executor.id)})`;
+    }
+    return `${executor.tag} (${userMention(executor.id)})`;
+  };
+
+  const getExecutor = async (guild, opts) => {
+    // opts: { types?: number|number[], targetId?: string, windowMs?: number }
+    const types = Array.isArray(opts?.types) ? opts.types : (opts?.types ? [opts.types] : []);
+    const targetId = opts?.targetId;
+    const windowMs = opts?.windowMs ?? 7000; // Slightly longer window to catch entries
     try {
-      // Add a small delay to allow audit log to be written
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      const auditLogs = await guild.fetchAuditLogs({ limit: 5, type: actionType });
-      
-      // Find the most recent entry (within last 5 seconds)
-      for (const entry of auditLogs.entries.values()) {
-        if (entry.executor && Date.now() - entry.createdTimestamp < 5000) {
-          return entry.executor;
+      // Small delay to allow audit log to be written
+      await new Promise(resolve => setTimeout(resolve, 1200));
+
+      // If specific types provided, search them; otherwise fetch recent generic entries
+      const fetches = types.length ?
+        Promise.all(types.map(t => guild.fetchAuditLogs({ limit: 6, type: t }).catch(() => null))) :
+        guild.fetchAuditLogs({ limit: 12 }).then(r => [r]).catch(() => []);
+
+      const results = await fetches;
+      for (const res of results) {
+        if (!res) continue;
+        for (const entry of res.entries.values()) {
+          // Must be very recent and match target when provided
+          if (Date.now() - entry.createdTimestamp > windowMs) continue;
+          if (targetId && entry.target && entry.target.id && entry.target.id !== targetId) continue;
+          if (entry.executor) return entry.executor;
         }
       }
     } catch (err) {
@@ -113,14 +135,14 @@ const auditLogs = () => {
       if (!first?.guild) return;
       const logChan = await fetchLogChannel(first.guild, "message");
       if (logChan && first.channelId === logChan.id) return;
-      const executor = await getExecutor(first.guild, AuditLogEvent.MessageBulkDelete);
+      const executor = await getExecutor(first.guild, { types: AuditLogEvent.MessageBulkDelete, targetId: first.channel?.id });
       const embed = new EmbedBuilder()
         .setColor("#EF4444")
         .setTitle("🧹 Messages Bulk Deleted")
         .addFields(
           { name: "Channel", value: first.channel ? `${first.channel}` : "Unknown", inline: true },
           { name: "Count", value: `${messages.size}`, inline: true },
-          { name: "Deleted By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown", inline: true }
+          { name: "Deleted By", value: formatExecutor(first.guild, executor), inline: true }
         );
       await sendLog(first.guild, embed, "message");
     } catch (err) {
@@ -220,7 +242,7 @@ const auditLogs = () => {
         return;
       }
 
-      const executor = await getExecutor(newMember.guild, AuditLogEvent.MemberUpdate);
+      const executor = await getExecutor(newMember.guild, { targetId: newMember.id });
       const embed = new EmbedBuilder()
         .setColor("#3B82F6")
         .setTitle("🛠️ Member Updated")
@@ -230,7 +252,7 @@ const auditLogs = () => {
             name: c.name,
             value: c.value.length > 1024 ? `${c.value.slice(0, 1021)}...` : c.value,
           })),
-          { name: "Updated By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown" }
+          { name: "Updated By", value: formatExecutor(newMember.guild, executor) }
         );
       await sendLog(newMember.guild, embed, "member");
 
@@ -244,7 +266,7 @@ const auditLogs = () => {
   // Bans / Unbans
   client.on("guildBanAdd", async (ban) => {
     try {
-      const executor = await getExecutor(ban.guild, AuditLogEvent.MemberBanAdd);
+      const executor = await getExecutor(ban.guild, { types: AuditLogEvent.MemberBanAdd, targetId: ban.user.id });
       const embed = new EmbedBuilder()
         .setColor("#EF4444")
         .setTitle("🔨 User Banned")
@@ -252,7 +274,7 @@ const auditLogs = () => {
         .addFields(
           { name: "User", value: `${ban.user.tag} (${userMention(ban.user.id)})`, inline: true },
           { name: "Reason", value: ban.reason || "Not provided", inline: true },
-          { name: "Banned By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown", inline: true }
+          { name: "Banned By", value: formatExecutor(ban.guild, executor), inline: true }
         );
       await sendLog(ban.guild, embed, "mod");
     } catch (err) {
@@ -262,14 +284,14 @@ const auditLogs = () => {
 
   client.on("guildBanRemove", async (ban) => {
     try {
-      const executor = await getExecutor(ban.guild, AuditLogEvent.MemberBanRemove);
+      const executor = await getExecutor(ban.guild, { types: AuditLogEvent.MemberBanRemove, targetId: ban.user.id });
       const embed = new EmbedBuilder()
         .setColor("#22C55E")
         .setTitle("♻️ User Unbanned")
         .setThumbnail(ban.user.displayAvatarURL({ dynamic: true }))
         .addFields(
           { name: "User", value: `${ban.user.tag} (${userMention(ban.user.id)})`, inline: true },
-          { name: "Unbanned By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown", inline: true }
+          { name: "Unbanned By", value: formatExecutor(ban.guild, executor), inline: true }
         );
       await sendLog(ban.guild, embed, "mod");
     } catch (err) {
@@ -285,14 +307,14 @@ const auditLogs = () => {
     try {
       if (!channel.guild) return;
       if (isLogChannel(channel.id)) return;
-      const executor = await getExecutor(channel.guild, AuditLogEvent.ChannelCreate);
+      const executor = await getExecutor(channel.guild, { types: AuditLogEvent.ChannelCreate, targetId: channel.id });
       const embed = new EmbedBuilder()
         .setColor("#22C55E")
         .setTitle("📁 Channel Created")
         .addFields(
           { name: "Channel", value: `${channel}` },
           { name: "Type", value: `${ChannelType[channel.type] || channel.type}` },
-          { name: "Created By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown" }
+          { name: "Created By", value: formatExecutor(channel.guild, executor) }
         );
       await sendLog(channel.guild, embed, "channel");
     } catch (err) {
@@ -304,14 +326,14 @@ const auditLogs = () => {
     try {
       if (!channel.guild) return;
       if (isLogChannel(channel.id)) return;
-      const executor = await getExecutor(channel.guild, AuditLogEvent.ChannelDelete);
+      const executor = await getExecutor(channel.guild, { types: AuditLogEvent.ChannelDelete, targetId: channel.id });
       const embed = new EmbedBuilder()
         .setColor("#EF4444")
         .setTitle("🗑️ Channel Deleted")
         .addFields(
           { name: "Channel", value: `${channel.name}` },
           { name: "Type", value: `${ChannelType[channel.type] || channel.type}` },
-          { name: "Deleted By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown" }
+          { name: "Deleted By", value: formatExecutor(channel.guild, executor) }
         );
       await sendLog(channel.guild, embed, "channel");
     } catch (err) {
@@ -329,14 +351,14 @@ const auditLogs = () => {
         changes.push(`Slowmode: ${oldChannel.rateLimitPerUser || 0}s → ${newChannel.rateLimitPerUser || 0}s`);
       }
       if (!changes.length) return;
-      const executor = await getExecutor(newChannel.guild, AuditLogEvent.ChannelUpdate);
+      const executor = await getExecutor(newChannel.guild, { types: AuditLogEvent.ChannelUpdate, targetId: newChannel.id });
       const embed = new EmbedBuilder()
         .setColor("#3B82F6")
         .setTitle("🛠️ Channel Updated")
         .addFields(
           { name: "Channel", value: `${newChannel}` },
           { name: "Changes", value: changes.join("\n").slice(0, 1024) },
-          { name: "Updated By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown" }
+          { name: "Updated By", value: formatExecutor(newChannel.guild, executor) }
         );
       await sendLog(newChannel.guild, embed, "channel");
     } catch (err) {
