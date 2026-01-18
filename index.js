@@ -111,5 +111,7 @@ const vanity = require("./features/vanity");
 vanity();
 const move = require("./features/move");
 move();
+const mentionReaction = require("./features/mentionReaction");
+mentionReaction();
 client.login(token);
 console.log('tested');
