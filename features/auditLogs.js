@@ -11,6 +11,8 @@ const {
 let registered = false;
 // Track last-seen member state to avoid logging stale/duplicate member updates
 const memberState = new Map();
+// Track newly joined members to ignore auto-role assignments
+const recentJoins = new Map();
 
 const auditLogs = () => {
   if (registered) return;
@@ -64,18 +66,11 @@ const auditLogs = () => {
     try {
       // Add a small delay to allow audit log to be written
       await new Promise(resolve => setTimeout(resolve, 1000));
-      const auditLogs = await guild.fetchAuditLogs({ limit: 25 });
+      const auditLogs = await guild.fetchAuditLogs({ limit: 5, type: actionType });
       
-      // Find the most recent entry of the specified type (should be within last few seconds)
+      // Find the most recent entry (within last 5 seconds)
       for (const entry of auditLogs.entries.values()) {
-        if (entry.action === actionType && entry.executor && Date.now() - entry.createdTimestamp < 5000) {
-          return entry.executor;
-        }
-      }
-      
-      // Fallback: search all types if no recent match found
-      for (const entry of auditLogs.entries.values()) {
-        if (entry.action === actionType && entry.executor) {
+        if (entry.executor && Date.now() - entry.createdTimestamp < 5000) {
           return entry.executor;
         }
       }
@@ -136,6 +131,18 @@ const auditLogs = () => {
   // Member join/leave
   client.on("guildMemberAdd", async (member) => {
     try {
+      // Initialize member state with current roles (at join time)
+      memberState.set(member.id, {
+        nickname: member.nickname ?? null,
+        roles: new Set(member.roles.cache.keys())
+      });
+      
+      // Mark this member as recently joined (ignore role updates for 10 seconds)
+      recentJoins.set(member.id, Date.now());
+      setTimeout(() => {
+        recentJoins.delete(member.id);
+      }, 10000);
+      
       const embed = new EmbedBuilder()
         .setColor("#22C55E")
         .setTitle("✅ Member Joined")
@@ -171,6 +178,17 @@ const auditLogs = () => {
   // Member updates: nick/roles/timeouts
   client.on("guildMemberUpdate", async (oldMember, newMember) => {
     try {
+      // Ignore updates for recently joined members (auto-role assignments)
+      const joinTime = recentJoins.get(newMember.id);
+      if (joinTime && Date.now() - joinTime < 10000) {
+        // Update state silently without logging
+        memberState.set(newMember.id, {
+          nickname: newMember.nickname ?? null,
+          roles: new Set(newMember.roles.cache.keys())
+        });
+        return;
+      }
+      
       const prev = memberState.get(newMember.id) || {
         nickname: oldMember?.nickname ?? newMember.nickname ?? null,
         roles: new Set(oldMember?.roles?.cache?.keys?.() || newMember.roles.cache.keys())
