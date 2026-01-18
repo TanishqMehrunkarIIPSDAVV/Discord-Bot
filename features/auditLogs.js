@@ -13,6 +13,8 @@ let registered = false;
 const memberState = new Map();
 // Track newly joined members to ignore auto-role assignments
 const recentJoins = new Map();
+// Role ID to exclude from member role update logs
+const EXCLUDED_ROLE_ID = "1439549961661448245";
 
 const auditLogs = () => {
   if (registered) return;
@@ -227,8 +229,8 @@ const auditLogs = () => {
 
       const prevRoles = prev.roles;
       const currRoles = new Set(newMember.roles.cache.keys());
-      const added = [...currRoles].filter((r) => !prevRoles.has(r));
-      const removed = [...prevRoles].filter((r) => !currRoles.has(r));
+      const added = [...currRoles].filter((r) => !prevRoles.has(r) && r !== EXCLUDED_ROLE_ID);
+      const removed = [...prevRoles].filter((r) => !currRoles.has(r) && r !== EXCLUDED_ROLE_ID);
 
       if (added.length) {
         changes.push({ name: "Roles Added", value: added.map((id) => `<@&${id}>`).join(" ") });
