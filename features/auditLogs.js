@@ -64,7 +64,8 @@ const auditLogs = () => {
     try {
       if (!newMsg.guild) return;
       if (newMsg.author?.bot) return;
-      if (newMsg.channelId === logChannelId) return;
+      const logChan = await fetchLogChannel(newMsg.guild, "message");
+      if (logChan && newMsg.channelId === logChan.id) return;
       const before = oldMsg?.content || "*No content cached*";
       const after = newMsg?.content || "*No content*";
       if (before === after) return;
@@ -89,7 +90,8 @@ const auditLogs = () => {
     try {
       const first = messages.first();
       if (!first?.guild) return;
-      if (first.channelId === logChannelId) return;
+      const logChan = await fetchLogChannel(first.guild, "message");
+      if (logChan && first.channelId === logChan.id) return;
       const embed = new EmbedBuilder()
         .setColor("#EF4444")
         .setTitle("🧹 Messages Bulk Deleted")
