@@ -5,6 +5,7 @@ const {
   PermissionsBitField,
   ChannelType,
   userMention,
+  AuditLogEvent,
 } = require("discord.js");
 
 let registered = false;
@@ -59,6 +60,31 @@ const auditLogs = () => {
     }
   };
 
+  const getExecutor = async (guild, actionType) => {
+    try {
+      // Add a small delay to allow audit log to be written
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const auditLogs = await guild.fetchAuditLogs({ limit: 25 });
+      
+      // Find the most recent entry of the specified type (should be within last few seconds)
+      for (const entry of auditLogs.entries.values()) {
+        if (entry.action === actionType && entry.executor && Date.now() - entry.createdTimestamp < 5000) {
+          return entry.executor;
+        }
+      }
+      
+      // Fallback: search all types if no recent match found
+      for (const entry of auditLogs.entries.values()) {
+        if (entry.action === actionType && entry.executor) {
+          return entry.executor;
+        }
+      }
+    } catch (err) {
+      console.error("getExecutor error:", err.message);
+    }
+    return null;
+  };
+
   // Message edits
   client.on("messageUpdate", async (oldMsg, newMsg) => {
     try {
@@ -92,12 +118,14 @@ const auditLogs = () => {
       if (!first?.guild) return;
       const logChan = await fetchLogChannel(first.guild, "message");
       if (logChan && first.channelId === logChan.id) return;
+      const executor = await getExecutor(first.guild, AuditLogEvent.MessageBulkDelete);
       const embed = new EmbedBuilder()
         .setColor("#EF4444")
         .setTitle("🧹 Messages Bulk Deleted")
         .addFields(
           { name: "Channel", value: first.channel ? `${first.channel}` : "Unknown", inline: true },
-          { name: "Count", value: `${messages.size}`, inline: true }
+          { name: "Count", value: `${messages.size}`, inline: true },
+          { name: "Deleted By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown", inline: true }
         );
       await sendLog(first.guild, embed, "message");
     } catch (err) {
@@ -174,6 +202,7 @@ const auditLogs = () => {
         return;
       }
 
+      const executor = await getExecutor(newMember.guild, AuditLogEvent.MemberUpdate);
       const embed = new EmbedBuilder()
         .setColor("#3B82F6")
         .setTitle("🛠️ Member Updated")
@@ -183,6 +212,7 @@ const auditLogs = () => {
             name: c.name,
             value: c.value.length > 1024 ? `${c.value.slice(0, 1021)}...` : c.value,
           })),
+          { name: "Updated By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown" }
         );
       await sendLog(newMember.guild, embed, "member");
 
@@ -196,13 +226,15 @@ const auditLogs = () => {
   // Bans / Unbans
   client.on("guildBanAdd", async (ban) => {
     try {
+      const executor = await getExecutor(ban.guild, AuditLogEvent.MemberBanAdd);
       const embed = new EmbedBuilder()
         .setColor("#EF4444")
         .setTitle("🔨 User Banned")
         .setThumbnail(ban.user.displayAvatarURL({ dynamic: true }))
         .addFields(
           { name: "User", value: `${ban.user.tag} (${userMention(ban.user.id)})`, inline: true },
-          { name: "Reason", value: ban.reason || "Not provided", inline: true }
+          { name: "Reason", value: ban.reason || "Not provided", inline: true },
+          { name: "Banned By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown", inline: true }
         );
       await sendLog(ban.guild, embed, "mod");
     } catch (err) {
@@ -212,12 +244,14 @@ const auditLogs = () => {
 
   client.on("guildBanRemove", async (ban) => {
     try {
+      const executor = await getExecutor(ban.guild, AuditLogEvent.MemberBanRemove);
       const embed = new EmbedBuilder()
         .setColor("#22C55E")
         .setTitle("♻️ User Unbanned")
         .setThumbnail(ban.user.displayAvatarURL({ dynamic: true }))
         .addFields(
-          { name: "User", value: `${ban.user.tag} (${userMention(ban.user.id)})`, inline: true }
+          { name: "User", value: `${ban.user.tag} (${userMention(ban.user.id)})`, inline: true },
+          { name: "Unbanned By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown", inline: true }
         );
       await sendLog(ban.guild, embed, "mod");
     } catch (err) {
@@ -233,12 +267,14 @@ const auditLogs = () => {
     try {
       if (!channel.guild) return;
       if (isLogChannel(channel.id)) return;
+      const executor = await getExecutor(channel.guild, AuditLogEvent.ChannelCreate);
       const embed = new EmbedBuilder()
         .setColor("#22C55E")
         .setTitle("📁 Channel Created")
         .addFields(
           { name: "Channel", value: `${channel}` },
-          { name: "Type", value: `${ChannelType[channel.type] || channel.type}` }
+          { name: "Type", value: `${ChannelType[channel.type] || channel.type}` },
+          { name: "Created By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown" }
         );
       await sendLog(channel.guild, embed, "channel");
     } catch (err) {
@@ -250,12 +286,14 @@ const auditLogs = () => {
     try {
       if (!channel.guild) return;
       if (isLogChannel(channel.id)) return;
+      const executor = await getExecutor(channel.guild, AuditLogEvent.ChannelDelete);
       const embed = new EmbedBuilder()
         .setColor("#EF4444")
         .setTitle("🗑️ Channel Deleted")
         .addFields(
           { name: "Channel", value: `${channel.name}` },
-          { name: "Type", value: `${ChannelType[channel.type] || channel.type}` }
+          { name: "Type", value: `${ChannelType[channel.type] || channel.type}` },
+          { name: "Deleted By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown" }
         );
       await sendLog(channel.guild, embed, "channel");
     } catch (err) {
@@ -273,12 +311,14 @@ const auditLogs = () => {
         changes.push(`Slowmode: ${oldChannel.rateLimitPerUser || 0}s → ${newChannel.rateLimitPerUser || 0}s`);
       }
       if (!changes.length) return;
+      const executor = await getExecutor(newChannel.guild, AuditLogEvent.ChannelUpdate);
       const embed = new EmbedBuilder()
         .setColor("#3B82F6")
         .setTitle("🛠️ Channel Updated")
         .addFields(
           { name: "Channel", value: `${newChannel}` },
-          { name: "Changes", value: changes.join("\n").slice(0, 1024) }
+          { name: "Changes", value: changes.join("\n").slice(0, 1024) },
+          { name: "Updated By", value: executor ? `${executor.tag} (${userMention(executor.id)})` : "Unknown" }
         );
       await sendLog(newChannel.guild, embed, "channel");
     } catch (err) {
@@ -293,24 +333,25 @@ const auditLogs = () => {
       if (!guild) return;
       const userId = newState.id || oldState.id;
       const userTag = (newState.member || oldState.member)?.user?.tag || userId;
-      const embed = new EmbedBuilder().setColor("#8B5CF6");
+      const logChan = await fetchLogChannel(guild, "voice");
+      if (!logChan) return;
+
+      let message = "";
       if (!oldState.channelId && newState.channelId) {
-        embed.setTitle("🎙️ Joined Voice")
-          .addFields({ name: "User", value: `${userTag} (${userMention(userId)})` }, { name: "Channel", value: `${newState.channel}` });
+        message = `${userTag} has joined the VC to ${newState.channel.name}`;
       } else if (oldState.channelId && !newState.channelId) {
-        embed.setTitle("📤 Left Voice")
-          .addFields({ name: "User", value: `${userTag} (${userMention(userId)})` }, { name: "Channel", value: `${oldState.channel}` });
+        message = `${userTag} has left the VC from ${oldState.channel.name}`;
       } else if (oldState.channelId !== newState.channelId) {
-        embed.setTitle("🔀 Moved Voice")
-          .addFields(
-            { name: "User", value: `${userTag} (${userMention(userId)})` },
-            { name: "From", value: `${oldState.channel}` },
-            { name: "To", value: `${newState.channel}` },
-          );
+        message = `${userTag} has moved from ${oldState.channel.name} to ${newState.channel.name}`;
       } else {
         return;
       }
-      await sendLog(guild, embed, "voice");
+
+      try {
+        await logChan.send(message);
+      } catch (err) {
+        console.error("auditLogs voiceStateUpdate send error:", err);
+      }
     } catch (err) {
       console.error("auditLogs voiceStateUpdate error:", err);
     }
