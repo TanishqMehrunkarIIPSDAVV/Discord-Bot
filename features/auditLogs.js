@@ -8,6 +8,8 @@ const {
 } = require("discord.js");
 
 let registered = false;
+// Track last-seen member state to avoid logging stale/duplicate member updates
+const memberState = new Map();
 
 const auditLogs = () => {
   if (registered) return;
@@ -139,24 +141,37 @@ const auditLogs = () => {
   // Member updates: nick/roles/timeouts
   client.on("guildMemberUpdate", async (oldMember, newMember) => {
     try {
+      const prev = memberState.get(newMember.id) || {
+        nickname: oldMember?.nickname ?? newMember.nickname ?? null,
+        roles: new Set(oldMember?.roles?.cache?.keys?.() || newMember.roles.cache.keys())
+      };
+
       const changes = [];
-      if (oldMember.nickname !== newMember.nickname) {
+
+      if (prev.nickname !== newMember.nickname) {
         changes.push({
           name: "Nickname",
-          value: `${oldMember.nickname || "None"} → ${newMember.nickname || "None"}`,
+          value: `${prev.nickname || "None"} → ${newMember.nickname || "None"}`,
         });
       }
-      const oldRoles = new Set(oldMember.roles.cache.keys());
-      const newRoles = new Set(newMember.roles.cache.keys());
-      const added = [...newRoles].filter((r) => !oldRoles.has(r));
-      const removed = [...oldRoles].filter((r) => !newRoles.has(r));
+
+      const prevRoles = prev.roles;
+      const currRoles = new Set(newMember.roles.cache.keys());
+      const added = [...currRoles].filter((r) => !prevRoles.has(r));
+      const removed = [...prevRoles].filter((r) => !currRoles.has(r));
+
       if (added.length) {
         changes.push({ name: "Roles Added", value: added.map((id) => `<@&${id}>`).join(" ") });
       }
       if (removed.length) {
         changes.push({ name: "Roles Removed", value: removed.map((id) => `<@&${id}>`).join(" ") });
       }
-      if (!changes.length) return;
+
+      if (!changes.length) {
+        memberState.set(newMember.id, { nickname: newMember.nickname ?? null, roles: currRoles });
+        return;
+      }
+
       const embed = new EmbedBuilder()
         .setColor("#3B82F6")
         .setTitle("🛠️ Member Updated")
@@ -168,6 +183,9 @@ const auditLogs = () => {
           })),
         );
       await sendLog(newMember.guild, embed, "member");
+
+      // Update snapshot after logging
+      memberState.set(newMember.id, { nickname: newMember.nickname ?? null, roles: currRoles });
     } catch (err) {
       console.error("auditLogs guildMemberUpdate error:", err);
     }
