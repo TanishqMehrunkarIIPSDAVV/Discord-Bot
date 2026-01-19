@@ -22,8 +22,8 @@ const mentionReaction = () => {
       }
     }
 
-    // React only if the bot is mentioned
-    if (message.mentions.has(TARGET_USER_ID)) {
+    // React only if the user is directly mentioned (not via role)
+    if (message.mentions.users.has(TARGET_USER_ID)) {
       try {
         await message.react("🍭");
       } catch (error) {
