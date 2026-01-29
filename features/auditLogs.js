@@ -13,6 +13,8 @@ let registered = false;
 const memberState = new Map();
 // Track newly joined members to ignore auto-role assignments
 const recentJoins = new Map();
+// Track recent timeout changes to avoid duplicate logs
+const recentTimeouts = new Map();
 // Role ID to exclude from member role update logs
 const EXCLUDED_ROLE_ID = "1439549961661448245";
 
@@ -25,6 +27,7 @@ const auditLogs = () => {
     memberState.set(member.id, {
       nickname: member.nickname ?? null,
       roles: new Set(member.roles.cache.keys()),
+      communicationDisabledUntil: member.communicationDisabledUntil,
     });
   };
 
@@ -243,7 +246,8 @@ const auditLogs = () => {
       
       const prev = memberState.get(newMember.id) || {
         nickname: oldMember?.nickname ?? newMember.nickname ?? null,
-        roles: new Set(oldMember?.roles?.cache?.keys?.() || newMember.roles.cache.keys())
+        roles: new Set(oldMember?.roles?.cache?.keys?.() || newMember.roles.cache.keys()),
+        communicationDisabledUntil: oldMember?.communicationDisabledUntil ?? null
       };
 
       const changes = [];
@@ -253,6 +257,56 @@ const auditLogs = () => {
           name: "Nickname",
           value: `${prev.nickname || "None"} → ${newMember.nickname || "None"}`,
         });
+      }
+
+      // Check for timeout changes
+      const prevTimeout = prev.communicationDisabledUntil;
+      const currTimeout = newMember.communicationDisabledUntil;
+      const timeoutAdded = !prevTimeout && currTimeout;
+      const timeoutRemoved = prevTimeout && !currTimeout;
+
+      if (timeoutAdded || timeoutRemoved) {
+        // Prevent duplicate timeout logs within 3 seconds (Discord may send multiple events)
+        const timeoutKey = `${newMember.id}-${timeoutAdded ? 'add' : 'remove'}`;
+        const lastLogTime = recentTimeouts.get(timeoutKey);
+        const now = Date.now();
+        
+        if (lastLogTime && (now - lastLogTime) < 3000) {
+          // Already logged recently, skip duplicate
+          snapshotMemberState(newMember);
+          return;
+        }
+        
+        recentTimeouts.set(timeoutKey, now);
+        // Clean up after 4 seconds
+        setTimeout(() => recentTimeouts.delete(timeoutKey), 4000);
+        const timeoutExecutor = await getExecutor(newMember.guild, { types: AuditLogEvent.MemberUpdate, targetId: newMember.id, windowMs: 5000 });
+        if (timeoutAdded) {
+          const durationMs = currTimeout.getTime() - Date.now();
+          const durationSec = Math.max(0, Math.floor(durationMs / 1000));
+          const embed = new EmbedBuilder()
+            .setColor("#F97316")
+            .setTitle("⏱️ Member Timed Out")
+            .addFields(
+              { name: "User", value: `${newMember.user.tag} (${userMention(newMember.id)})` },
+              { name: "Duration", value: durationSec > 0 ? `${durationSec} seconds` : "Expired", inline: true },
+              { name: "Until", value: `<t:${Math.floor(currTimeout.getTime() / 1000)}:F>`, inline: true },
+              { name: "Timed Out By", value: formatExecutor(newMember.guild, timeoutExecutor) }
+            );
+          await sendLog(newMember.guild, embed, "member");
+        } else if (timeoutRemoved) {
+          const embed = new EmbedBuilder()
+            .setColor("#22C55E")
+            .setTitle("✅ Member Timeout Removed")
+            .addFields(
+              { name: "User", value: `${newMember.user.tag} (${userMention(newMember.id)})` },
+              { name: "Timeout Lifted By", value: formatExecutor(newMember.guild, timeoutExecutor) }
+            );
+          await sendLog(newMember.guild, embed, "member");
+        }
+        // Update snapshot and return early to avoid duplicate logging
+        snapshotMemberState(newMember);
+        return;
       }
 
       const prevRoles = prev.roles;
@@ -291,7 +345,11 @@ const auditLogs = () => {
       await sendLog(newMember.guild, embed, "member");
 
       // Update snapshot after logging
-      memberState.set(newMember.id, { nickname: newMember.nickname ?? null, roles: currRoles });
+      memberState.set(newMember.id, {
+        nickname: newMember.nickname ?? null,
+        roles: currRoles,
+        communicationDisabledUntil: newMember.communicationDisabledUntil
+      });
     } catch (err) {
       console.error("auditLogs guildMemberUpdate error:", err);
     }
