@@ -28,7 +28,7 @@ const auditLogs = () => {
     });
   };
 
-  client.once("ready", async () => {
+  client.once("clientReady", async () => {
     try {
       for (const guild of client.guilds.cache.values()) {
         // Use cached members only to avoid heavy startup fetches
