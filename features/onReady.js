@@ -12,6 +12,21 @@ const onReady=()=>
           type: ActivityType.Watching,
         });
         console.log('Ready!');
+        
+        // Initialize scheduled removals with slight delay to ensure full client readiness
+        setTimeout(() => {
+            try {
+                const removemeCommand = require('../commands/removeme');
+                if (removemeCommand.initializeTimers) {
+                    removemeCommand.initializeTimers(client);
+                    console.log('[RemoveMe] Scheduled removals initialized');
+                } else {
+                    console.log('[RemoveMe] initializeTimers function not found');
+                }
+            } catch (err) {
+                console.error('[RemoveMe] Error initializing scheduled removals:', err);
+            }
+        }, 1000);
     });
 }
 module.exports=onReady;

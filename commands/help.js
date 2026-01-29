@@ -45,7 +45,8 @@ const helpPages = [
             `**21.** \`ct skip\`: Skip current song ⏭️\n` +
             `**22.** \`ct queue\`: Show queue 🎶\n` +
             `**23.** \`ct tts <text>\`: Speak in VC 🎤\n` +
-            `**24.** \`ct disconnect\`: Disconnect bot ❌\n`
+            `**24.** </removeme:>: Schedule VC removal ⏰\n` +
+            `**25.** \`ct disconnect\`: Disconnect bot ❌\n`
         )
         .setFooter({ text: "Use the ⏮️ Previous and ⏭️ Next buttons to navigate pages!" }),
 ];
