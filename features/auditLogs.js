@@ -20,6 +20,27 @@ const auditLogs = () => {
   if (registered) return;
   registered = true;
 
+  const snapshotMemberState = (member) => {
+    if (!member) return;
+    memberState.set(member.id, {
+      nickname: member.nickname ?? null,
+      roles: new Set(member.roles.cache.keys()),
+    });
+  };
+
+  client.once("ready", async () => {
+    try {
+      for (const guild of client.guilds.cache.values()) {
+        // Use cached members only to avoid heavy startup fetches
+        for (const member of guild.members.cache.values()) {
+          snapshotMemberState(member);
+        }
+      }
+    } catch (err) {
+      console.error("auditLogs seed memberState error:", err);
+    }
+  });
+
   const cfgPath = path.join(__dirname, "..", "config.json");
   let cfg = {};
   try { cfg = require(cfgPath); } catch {}
@@ -78,10 +99,10 @@ const auditLogs = () => {
     // opts: { types?: number|number[], targetId?: string, windowMs?: number }
     const types = Array.isArray(opts?.types) ? opts.types : (opts?.types ? [opts.types] : []);
     const targetId = opts?.targetId;
-    const windowMs = opts?.windowMs ?? 7000; // Slightly longer window to catch entries
+    const windowMs = opts?.windowMs ?? 15000; // Longer window to catch delayed entries
     try {
       // Small delay to allow audit log to be written
-      await new Promise(resolve => setTimeout(resolve, 1200));
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // If specific types provided, search them; otherwise fetch recent generic entries
       const fetches = types.length ?
@@ -156,10 +177,7 @@ const auditLogs = () => {
   client.on("guildMemberAdd", async (member) => {
     try {
       // Initialize member state with current roles (at join time)
-      memberState.set(member.id, {
-        nickname: member.nickname ?? null,
-        roles: new Set(member.roles.cache.keys())
-      });
+      snapshotMemberState(member);
       
       // Mark this member as recently joined (ignore role updates for 10 seconds)
       recentJoins.set(member.id, Date.now());
@@ -206,11 +224,21 @@ const auditLogs = () => {
       const joinTime = recentJoins.get(newMember.id);
       if (joinTime && Date.now() - joinTime < 10000) {
         // Update state silently without logging
-        memberState.set(newMember.id, {
-          nickname: newMember.nickname ?? null,
-          roles: new Set(newMember.roles.cache.keys())
-        });
+        snapshotMemberState(newMember);
         return;
+      }
+
+      const hasPrevState = memberState.has(newMember.id);
+      if (!hasPrevState) {
+        const oldRoles = oldMember?.roles?.cache;
+        const oldRolesSize = typeof oldRoles?.size === "number" ? oldRoles.size : 0;
+        const onlyEveryone = oldRolesSize === 1 && oldRoles.has(newMember.guild.id);
+        const isPartialRoles = oldMember?.partial || !oldRoles || onlyEveryone;
+        if (isPartialRoles) {
+          // Avoid false-positive "all roles added" logs from partial data
+          snapshotMemberState(newMember);
+          return;
+        }
       }
       
       const prev = memberState.get(newMember.id) || {
@@ -244,7 +272,11 @@ const auditLogs = () => {
         return;
       }
 
-      const executor = await getExecutor(newMember.guild, { targetId: newMember.id });
+      const needsRoleAudit = added.length || removed.length;
+      const auditTypes = needsRoleAudit
+        ? [AuditLogEvent.MemberRoleUpdate, AuditLogEvent.MemberUpdate]
+        : AuditLogEvent.MemberUpdate;
+      const executor = await getExecutor(newMember.guild, { types: auditTypes, targetId: newMember.id });
       const embed = new EmbedBuilder()
         .setColor("#3B82F6")
         .setTitle("🛠️ Member Updated")

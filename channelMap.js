@@ -1,4 +1,4 @@
-module.exports={
+module.exports = {
   "chilling vc": "1439526437110415480",
   "bhasad vc": "1439527050833559643",
   "dhandha vc": "1439528457930543135",
@@ -24,7 +24,7 @@ module.exports={
   "nona vc": "1439531033702830270",
 
   "deca vc": "1439531226284429352",
-    "gaming vc": "1439533754464079962",
-"manoranjan vc":"1452637716255608923",
-"accha net vc":"1452648230285344940",
+  "gaming vc": "1439533754464079962",
+  "manoranjan vc": "1452637716255608923",
+  "accha net vc": "1452648230285344940",
 };
