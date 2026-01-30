@@ -5,10 +5,20 @@ const { userMention } = require("discord.js");
 const messageTimestamps = new Map();
 const messageContents = new Map();
 
+// User IDs to exclude from spam detection (moderators, trusted users, etc.)
+const EXCLUDED_USER_IDS = [
+    // Add user IDs here to exclude them from spam timeout
+    // Example: "123456789012345678",
+    "1002574512866480178"
+];
+
 const spam = () => {
     client.on("messageCreate", async (message) => {
         if(message.channel.id === "1439573831831392428") return;
         if (message.author.bot) return;
+        
+        // Skip spam detection for excluded users
+        if (EXCLUDED_USER_IDS.includes(message.author.id)) return;
 
         const now = Date.now();
         const userId = message.author.id;
