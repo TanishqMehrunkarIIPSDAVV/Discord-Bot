@@ -18,6 +18,15 @@ const recentTimeouts = new Map();
 // Role ID to exclude from member role update logs
 const EXCLUDED_ROLE_ID = "1439549961661448245";
 
+// Control which member update types to log (set to false to disable specific logs)
+const LOG_SETTINGS = {
+  nickname: true,        // Log nickname changes
+  roles: true,           // Log role changes
+  timeouts: true,        // Log timeout add/remove
+  joins: true,           // Log member joins
+  leaves: true           // Log member leaves
+};
+
 const auditLogs = () => {
   if (registered) return;
   registered = true;
@@ -188,6 +197,8 @@ const auditLogs = () => {
         recentJoins.delete(member.id);
       }, 10000);
       
+      if (!LOG_SETTINGS.joins) return;
+      
       const embed = new EmbedBuilder()
         .setColor("#22C55E")
         .setTitle("✅ Member Joined")
@@ -205,6 +216,8 @@ const auditLogs = () => {
 
   client.on("guildMemberRemove", async (member) => {
     try {
+      if (!LOG_SETTINGS.leaves) return;
+      
       const embed = new EmbedBuilder()
         .setColor("#EF4444")
         .setTitle("❌ Member Left")
@@ -252,7 +265,7 @@ const auditLogs = () => {
 
       const changes = [];
 
-      if (prev.nickname !== newMember.nickname) {
+      if (LOG_SETTINGS.nickname && prev.nickname !== newMember.nickname) {
         changes.push({
           name: "Nickname",
           value: `${prev.nickname || "None"} → ${newMember.nickname || "None"}`,
@@ -262,34 +275,51 @@ const auditLogs = () => {
       // Check for timeout changes
       const prevTimeout = prev.communicationDisabledUntil;
       const currTimeout = newMember.communicationDisabledUntil;
-      const timeoutAdded = !prevTimeout && currTimeout;
-      const timeoutRemoved = prevTimeout && !currTimeout;
+      
+      // Normalize dates for comparison (handle both Date objects and null)
+      const prevTimeMs = prevTimeout instanceof Date ? prevTimeout.getTime() : null;
+      const currTimeMs = currTimeout instanceof Date ? currTimeout.getTime() : null;
+      
+      // Only log if there's an actual change in timeout value
+      const timeoutChanged = prevTimeMs !== currTimeMs;
+      const timeoutAdded = !prevTimeMs && currTimeMs;
+      const timeoutRemoved = prevTimeMs && !currTimeMs;
+      const timeoutModified = prevTimeMs && currTimeMs && prevTimeMs !== currTimeMs;
 
-      if (timeoutAdded || timeoutRemoved) {
-        // Prevent duplicate timeout logs within 3 seconds (Discord may send multiple events)
-        const timeoutKey = `${newMember.id}-${timeoutAdded ? 'add' : 'remove'}`;
+      if (timeoutChanged && (timeoutAdded || timeoutRemoved || timeoutModified) && LOG_SETTINGS.timeouts) {
+        // Skip if timeout is in the past (expired timeout, not a new action)
+        if (timeoutAdded && currTimeMs <= Date.now()) {
+          snapshotMemberState(newMember);
+          return;
+        }
+        
+        // Prevent duplicate timeout logs within 5 seconds (Discord may send multiple events)
+        const timeoutKey = `${newMember.id}-${timeoutAdded ? 'add' : timeoutRemoved ? 'remove' : 'modify'}-${currTimeMs || prevTimeMs}`;
         const lastLogTime = recentTimeouts.get(timeoutKey);
         const now = Date.now();
         
-        if (lastLogTime && (now - lastLogTime) < 3000) {
+        if (lastLogTime && (now - lastLogTime) < 5000) {
           // Already logged recently, skip duplicate
           snapshotMemberState(newMember);
           return;
         }
         
         recentTimeouts.set(timeoutKey, now);
-        // Clean up after 4 seconds
-        setTimeout(() => recentTimeouts.delete(timeoutKey), 4000);
+        // Clean up after 6 seconds
+        setTimeout(() => recentTimeouts.delete(timeoutKey), 6000);
+        
         const timeoutExecutor = await getExecutor(newMember.guild, { types: AuditLogEvent.MemberUpdate, targetId: newMember.id, windowMs: 5000 });
+        
         if (timeoutAdded) {
           const durationMs = currTimeout.getTime() - Date.now();
           const durationSec = Math.max(0, Math.floor(durationMs / 1000));
+          const durationMin = Math.floor(durationSec / 60);
           const embed = new EmbedBuilder()
             .setColor("#F97316")
             .setTitle("⏱️ Member Timed Out")
             .addFields(
               { name: "User", value: `${newMember.user.tag} (${userMention(newMember.id)})` },
-              { name: "Duration", value: durationSec > 0 ? `${durationSec} seconds` : "Expired", inline: true },
+              { name: "Duration", value: durationMin > 0 ? `${durationMin} minute${durationMin !== 1 ? 's' : ''}` : "Less than 1 minute", inline: true },
               { name: "Until", value: `<t:${Math.floor(currTimeout.getTime() / 1000)}:F>`, inline: true },
               { name: "Timed Out By", value: formatExecutor(newMember.guild, timeoutExecutor) }
             );
@@ -314,10 +344,10 @@ const auditLogs = () => {
       const added = [...currRoles].filter((r) => !prevRoles.has(r) && r !== EXCLUDED_ROLE_ID);
       const removed = [...prevRoles].filter((r) => !currRoles.has(r) && r !== EXCLUDED_ROLE_ID);
 
-      if (added.length) {
+      if (LOG_SETTINGS.roles && added.length) {
         changes.push({ name: "Roles Added", value: added.map((id) => `<@&${id}>`).join(" ") });
       }
-      if (removed.length) {
+      if (LOG_SETTINGS.roles && removed.length) {
         changes.push({ name: "Roles Removed", value: removed.map((id) => `<@&${id}>`).join(" ") });
       }
 
