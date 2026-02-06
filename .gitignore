@@ -4,7 +4,6 @@
 /.env.development.local
 /.env.test.local
 /.env.production.local
-config.json
 Discord Bot.zip
 ffmpeg-snapshot.tar.bz2
 discord.zip
