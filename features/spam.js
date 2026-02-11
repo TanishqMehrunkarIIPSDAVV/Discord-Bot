@@ -14,8 +14,12 @@ const EXCLUDED_USER_IDS = [
 
 const spam = () => {
     client.on("messageCreate", async (message) => {
-        if(message.channel.id === "1439573831831392428") return;
-        if (message.author.bot) return;
+        if(message.channel.id === "1439573831831392428" ||
+            message.channel.id === "1439536650123476992" ||
+            message.channel.id === "941243940915515392" ||
+            message.channel.id === "941244061162033152"
+        ) return;
+        if (message.author.bot && message.author.id !== client.user?.id) return;
         
         // Skip spam detection for excluded users
         if (EXCLUDED_USER_IDS.includes(message.author.id)) return;
