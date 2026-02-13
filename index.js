@@ -1,6 +1,6 @@
 "use strict";
 
-const token = process.env.token;
+const token = process.env.token || require('./config.json').token;
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection,GatewayIntentBits,Partials} = require('discord.js');
@@ -113,5 +113,7 @@ const move = require("./features/move");
 move();
 const mentionReaction = require("./features/mentionReaction");
 mentionReaction();
+const confessions = require("./features/confessions");
+confessions();
 client.login(token);
 console.log('tested');

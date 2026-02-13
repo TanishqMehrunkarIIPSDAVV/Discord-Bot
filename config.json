@@ -8,5 +8,7 @@
   "memberLogChannelId": "1462480489318187333",
   "channelLogChannelId": "1462481182980837621",
   "voiceLogChannelId": "940160929864241245",
-  "modLogChannelId": "1462481610506240122"
+  "modLogChannelId": "1462481610506240122",
+  "confessionInputChannelId": "1471953784560156824",
+  "confessionOutputChannelId": "1471953946993229825"
 }

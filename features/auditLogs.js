@@ -490,34 +490,40 @@ const auditLogs = () => {
 
   // Voice joins/moves/leaves
   client.on("voiceStateUpdate", async (oldState, newState) => {
-    try {
-      const guild = newState.guild || oldState.guild;
-      if (!guild) return;
-      const userId = newState.id || oldState.id;
-      const userTag = (newState.member || oldState.member)?.user?.tag || userId;
-      const logChan = await fetchLogChannel(guild, "voice");
-      if (!logChan) return;
+  try {
+    const guild = newState.guild || oldState.guild;
+    if (!guild) return;
 
-      let message = "";
-      if (!oldState.channelId && newState.channelId) {
-        message = `${userMention(userId)} has joined ${newState.channel.name}`;
-      } else if (oldState.channelId && !newState.channelId) {
-        message = `${userMention(userId)} has left ${oldState.channel.name}`;
-      } else if (oldState.channelId !== newState.channelId) {
-        message = `${userMention(userId)} has moved from ${oldState.channel.name} to ${newState.channel.name}`;
-      } else {
-        return;
-      }
+    const userId = newState.id || oldState.id;
+    const logChan = await fetchLogChannel(guild, "voice");
+    if (!logChan) return;
 
-      try {
-        await logChan.send(message);
-      } catch (err) {
-        console.error("auditLogs voiceStateUpdate send error:", err);
-      }
-    } catch (err) {
-      console.error("auditLogs voiceStateUpdate error:", err);
+    const time = new Date().toLocaleTimeString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour12: false
+    });
+
+    let message = "";
+
+    if (!oldState.channelId && newState.channelId) {
+      message = `${userMention(userId)} has joined ${newState.channel.name} at ${time}`;
+    } 
+    else if (oldState.channelId && !newState.channelId) {
+      message = `${userMention(userId)} has left ${oldState.channel.name} at ${time}`;
+    } 
+    else if (oldState.channelId !== newState.channelId) {
+      message = `${userMention(userId)} has moved from ${oldState.channel.name} to ${newState.channel.name} at ${time}`;
+    } 
+    else {
+      return;
     }
-  });
+
+    await logChan.send(message);
+
+  } catch (err) {
+    console.error("auditLogs voiceStateUpdate error:", err);
+  }
+});
 };
 
 module.exports = auditLogs;
