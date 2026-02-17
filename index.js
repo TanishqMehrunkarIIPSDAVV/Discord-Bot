@@ -115,5 +115,7 @@ const mentionReaction = require("./features/mentionReaction");
 mentionReaction();
 const confessions = require("./features/confessions");
 confessions();
+const complaints = require("./features/complaints");
+complaints();
 client.login(token);
 console.log('tested');

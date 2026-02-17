@@ -429,6 +429,8 @@ const auditLogs = () => {
     try {
       if (!channel.guild) return;
       if (isLogChannel(channel.id)) return;
+      // Skip logging confession and complaint channels
+      if (channel.name?.startsWith("confession-") || channel.name?.startsWith("complaint-")) return;
       const executor = await getExecutor(channel.guild, { types: AuditLogEvent.ChannelCreate, targetId: channel.id });
       const embed = new EmbedBuilder()
         .setColor("#22C55E")
@@ -448,6 +450,8 @@ const auditLogs = () => {
     try {
       if (!channel.guild) return;
       if (isLogChannel(channel.id)) return;
+      // Skip logging confession and complaint channels
+      if (channel.name?.startsWith("confession-") || channel.name?.startsWith("complaint-")) return;
       const executor = await getExecutor(channel.guild, { types: AuditLogEvent.ChannelDelete, targetId: channel.id });
       const embed = new EmbedBuilder()
         .setColor("#EF4444")
@@ -467,6 +471,8 @@ const auditLogs = () => {
     try {
       if (!newChannel.guild) return;
       if (isLogChannel(newChannel.id)) return;
+      // Skip logging confession and complaint channels
+      if (newChannel.name?.startsWith("confession-") || newChannel.name?.startsWith("complaint-")) return;
       const changes = [];
       if (oldChannel.name !== newChannel.name) changes.push(`Name: ${oldChannel.name} → ${newChannel.name}`);
       if ("rateLimitPerUser" in newChannel && oldChannel.rateLimitPerUser !== newChannel.rateLimitPerUser) {
