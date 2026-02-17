@@ -25,6 +25,8 @@ const confessions = () => {
     process.env.CONFESSION_INPUT_CHANNEL_ID || cfg.confessionInputChannelId;
   const outputChannelId =
     process.env.CONFESSION_OUTPUT_CHANNEL_ID || cfg.confessionOutputChannelId;
+  const adminChannelId =
+    process.env.CONFESSION_ADMIN_CHANNEL_ID || cfg.confessionAdminChannelId;
 
   // Send button message to input channel when bot starts
   client.on("clientReady", async () => {
@@ -218,6 +220,48 @@ const confessions = () => {
           }
 
           await outputChannel.send({ embeds: [embed] });
+
+          // Send to admin channel with user details for moderation
+          if (adminChannelId) {
+            const adminChannel = await client.channels
+              .fetch(adminChannelId)
+              .catch(() => null);
+
+            if (adminChannel) {
+              const adminEmbed = new EmbedBuilder()
+                .setTitle("📋 Confession Report (Admin)")
+                .setColor("#FF6B6B")
+                .addFields(
+                  {
+                    name: "User",
+                    value: `${user.tag} (${user.id})`,
+                    inline: false,
+                  },
+                  {
+                    name: "Confession Content",
+                    value:
+                      content.length > 0
+                        ? content.length > 1024
+                          ? `${content.slice(0, 1021)}...`
+                          : content
+                        : "*No text content*",
+                    inline: false,
+                  }
+                )
+                .setTimestamp();
+
+              if (attachments.length > 0) {
+                const filesText = attachments.join("\n");
+                adminEmbed.addFields({
+                  name: `Attachments (${attachments.length})`,
+                  value: filesText.length > 1024 ? `${filesText.slice(0, 1021)}...` : filesText,
+                  inline: false,
+                });
+              }
+
+              await adminChannel.send({ embeds: [adminEmbed] }).catch(() => {});
+            }
+          }
 
           await channel
             .send(
