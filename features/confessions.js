@@ -2,11 +2,9 @@ const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const {
   EmbedBuilder,
-  PermissionsBitField,
   ButtonBuilder,
   ButtonStyle,
   ActionRowBuilder,
-  ChannelType,
 } = require("discord.js");
 
 let registered = false;
@@ -44,7 +42,7 @@ const confessions = () => {
       const embed = new EmbedBuilder()
         .setTitle("📝 Share Your Confession")
         .setDescription(
-          "Click the button below to write an anonymous confession. A private channel will be created where only you can write your message."
+          "Click the button below to write an anonymous confession. I will DM you a form to submit your confession privately."
         )
         .setColor("#F4C16D");
 
@@ -81,121 +79,88 @@ const confessions = () => {
     if (interaction.customId !== "create_confession_channel") return;
 
     try {
-      const guild = interaction.guild;
       const user = interaction.user;
 
       // Defer reply
       await interaction.deferReply({ ephemeral: true });
 
-      // Create a private channel
-      const channel = await guild.channels.create({
-        name: `confession-${user.username}`,
-        type: ChannelType.GuildText,
-        topic: `Confession channel for ${user.tag}`,
-        permissionOverwrites: [
-          {
-            id: guild.id,
-            deny: [PermissionsBitField.Flags.ViewChannel],
-          },
-          {
-            id: user.id,
-            allow: [
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.SendMessages,
-              PermissionsBitField.Flags.ReadMessageHistory,
-            ],
-          },
-          {
-            id: client.user.id,
-            allow: [
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.SendMessages,
-              PermissionsBitField.Flags.ReadMessageHistory,
-              PermissionsBitField.Flags.ManageChannels,
-            ],
-          },
-        ],
-      });
+      // Send DM to user
+      const dmChannel = await user.createDM().catch(() => null);
+      if (!dmChannel) {
+        await interaction.editReply({
+          content: "❌ I couldn't open a DM with you. Please check your privacy settings:\n\n" +
+                   "**How to enable DMs from this bot:**\n" +
+                   "1. Open your Discord User Settings\n" +
+                   "2. Go to **Privacy & Safety**\n" +
+                   "3. Enable **Allow direct messages from server members**\n" +
+                   "4. Then try again!",
+        });
+        return;
+      }
 
-      // Send instructions
-      const instructionEmbed = new EmbedBuilder()
-        .setTitle("✅ Confession Channel Created")
+      // Send welcome message in DM
+      const welcomeEmbed = new EmbedBuilder()
+        .setTitle("📝 Write Your Confession")
         .setDescription(
-          `Your private confession channel is ready! Type your anonymous confession in ${channel} below. Once you send it, the channel will be automatically deleted.`
+          "Send your confession below. Your message will be posted anonymously to the confessions channel. You have 5 minutes to submit."
         )
+        .setColor("#F4C16D");
+
+      await dmChannel.send({ embeds: [welcomeEmbed] });
+
+      // Notify user in guild
+      const successEmbed = new EmbedBuilder()
+        .setTitle("✅ Check Your DMs")
+        .setDescription("I've sent you a DM to write your confession. Please check your messages!")
         .setColor("#F4C16D");
 
       await interaction.editReply({
-        embeds: [instructionEmbed],
+        embeds: [successEmbed],
       });
 
-      // Send welcome message in the private channel
-      const welcomeEmbed = new EmbedBuilder()
-        .setTitle("📝 Welcome to Your Confession Channel")
-        .setDescription(
-          "Write your confession below. Your message will be posted anonymously to the confessions channel, and this channel will then be deleted."
-        )
-        .setColor("#F4C16D");
+      // Listen for confession message using direct messageCreate event
+      const handleConfessionMessage = async (msg) => {
+        // Filter: must be from this user, in DM, and not a bot
+        if (msg.author.id !== user.id || msg.author.bot || !msg.channel.isDMBased()) {
+          return;
+        }
 
-      await channel.send({ embeds: [welcomeEmbed] });
+        console.log("✅ MESSAGE RECEIVED in DM from", user.tag, "content:", msg.content.substring(0, 50));
 
-      // Create message collector
-      const filter = (msg) => msg.author.id === user.id;
-      const collector = channel.createMessageCollector({ filter, time: 5 * 60 * 1000 });
+        // Remove this listener
+        client.removeListener("messageCreate", handleConfessionMessage);
 
-      collector.on("collect", async (message) => {
         try {
-          // Stop collector from collecting more messages
-          collector.stop("message_received");
+          const content = (msg.content || "").trim();
+          const attachments = msg.attachments?.map((a) => a.url) || [];
 
-          const outputChannel = await client.channels
-            .fetch(outputChannelId)
-            .catch(() => null);
-
-          if (!outputChannel) {
-            console.warn("confessions: output channel not found:", outputChannelId);
-            await channel
-              .send(
-                "❌ Error: Could not post your confession. Please try again later."
-              )
-              .catch(() => {});
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            await channel.delete().catch(() => {});
-            return;
-          }
-
-          const me = guild.members.me;
-          const perms = outputChannel.permissionsFor(me);
-          if (
-            !perms ||
-            !perms.has([
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.SendMessages,
-              PermissionsBitField.Flags.EmbedLinks,
-            ])
-          ) {
-            console.warn("confessions: missing permissions in output channel");
-            await channel
-              .send(
-                "❌ Error: Bot missing permissions. Please try again later."
-              )
-              .catch(() => {});
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            await channel.delete().catch(() => {});
-            return;
-          }
-
-          const content = (message.content || "").trim();
-          const attachments = message.attachments?.map((a) => a.url) || [];
+          console.log("📝 Content length:", content.length, "Attachments:", attachments.length);
 
           if (!content && attachments.length === 0) {
-            await channel
-              .send("Your message was empty. Channel will be deleted.")
-              .catch(() => {});
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            await channel.delete().catch(() => {});
+            console.log("❌ Empty message");
+            await dmChannel.send("Your message was empty.").catch(console.error);
             return;
           }
+
+          if (!outputChannelId) {
+            console.error("❌ NO OUTPUT CHANNEL ID SET");
+            await dmChannel.send("❌ System not configured").catch(console.error);
+            return;
+          }
+
+          console.log("🔍 Fetching output channel:", outputChannelId);
+          const outputChannel = await client.channels.fetch(outputChannelId).catch((err) => {
+            console.error("❌ FAILED TO FETCH CHANNEL:", err.message);
+            return null;
+          });
+
+          if (!outputChannel) {
+            console.error("❌ CHANNEL NOT FOUND:", outputChannelId);
+            await dmChannel.send("❌ Channel not found: " + outputChannelId).catch(console.error);
+            return;
+          }
+
+          console.log("✅ Channel fetched successfully");
 
           const embed = new EmbedBuilder()
             .setTitle("Anonymous Confession")
@@ -203,111 +168,68 @@ const confessions = () => {
             .setTimestamp();
 
           if (content) {
-            embed.setDescription(
-              content.length > 4000 ? `${content.slice(0, 3997)}...` : content
-            );
+            embed.setDescription(content.length > 4000 ? content.slice(0, 3997) + "..." : content);
           }
 
           if (attachments.length > 0) {
-            const filesList = attachments.join("\n");
             embed.addFields({
               name: `Attachments (${attachments.length})`,
-              value:
-                filesList.length > 1024
-                  ? `${filesList.slice(0, 1021)}...`
-                  : filesList,
+              value: attachments.join("\n"),
             });
           }
 
-          await outputChannel.send({ embeds: [embed] });
+          console.log("📤 SENDING MESSAGE TO CHANNEL:", outputChannelId);
+          const sentMsg = await outputChannel.send({ embeds: [embed] }).catch((err) => {
+            console.error("❌ FAILED TO SEND MESSAGE:", err.message);
+            throw err;
+          });
+          console.log("✅✅✅ MESSAGE SENT SUCCESSFULLY! ID:", sentMsg.id);
 
-          // Send to admin channel with user details for moderation
+          // Send to admin channel
           if (adminChannelId) {
-            const adminChannel = await client.channels
-              .fetch(adminChannelId)
-              .catch(() => null);
+            try {
+              console.log("📋 Sending to admin channel:", adminChannelId);
+              const adminChannel = await client.channels.fetch(adminChannelId).catch(() => null);
+              if (adminChannel) {
+                const adminEmbed = new EmbedBuilder()
+                  .setTitle("📋 Confession Report (Admin)")
+                  .setColor("#FF6B6B")
+                  .addFields(
+                    { name: "User", value: `${user.tag} (${user.id})`, inline: false },
+                    { name: "Content", value: content || "*No text*", inline: false }
+                  )
+                  .setTimestamp();
 
-            if (adminChannel) {
-              const adminEmbed = new EmbedBuilder()
-                .setTitle("📋 Confession Report (Admin)")
-                .setColor("#FF6B6B")
-                .addFields(
-                  {
-                    name: "User",
-                    value: `${user.tag} (${user.id})`,
-                    inline: false,
-                  },
-                  {
-                    name: "Confession Content",
-                    value:
-                      content.length > 0
-                        ? content.length > 1024
-                          ? `${content.slice(0, 1021)}...`
-                          : content
-                        : "*No text content*",
-                    inline: false,
-                  }
-                )
-                .setTimestamp();
-
-              if (attachments.length > 0) {
-                const filesText = attachments.join("\n");
-                adminEmbed.addFields({
-                  name: `Attachments (${attachments.length})`,
-                  value: filesText.length > 1024 ? `${filesText.slice(0, 1021)}...` : filesText,
-                  inline: false,
-                });
+                await adminChannel.send({ embeds: [adminEmbed] }).catch(console.error);
+                console.log("✅ Admin notification sent");
               }
-
-              await adminChannel.send({ embeds: [adminEmbed] }).catch(() => {});
+            } catch (e) {
+              console.error("❌ Admin notify error:", e.message);
             }
           }
 
-          await channel
-            .send(
-              "✅ Your confession has been posted successfully! This channel will now be deleted."
-            )
-            .catch(() => {});
-
-          await new Promise((resolve) => setTimeout(resolve, 1500));
-          await channel.delete().catch(() => {});
+          await dmChannel.send("✅ Your confession has been posted!").catch(console.error);
         } catch (err) {
-          console.error("confessions collector error:", err);
-          await channel
-            .send("An error occurred. Channel will be deleted.")
-            .catch(() => {});
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-          await channel.delete().catch(() => {});
+          console.error("❌ PROCESSING ERROR:", err.message);
+          await dmChannel.send("❌ Error: " + err.message).catch(console.error);
         }
-      });
+      };
 
-      collector.on("end", async (_, reason) => {
-        try {
-          if (reason === "message_received") return;
+      // Register the listener
+      console.log("🎧 Listening for DM from:", user.tag);
+      client.on("messageCreate", handleConfessionMessage);
 
-          const channelExists = await guild.channels
-            .fetch(channel.id)
-            .catch(() => null);
-          if (channelExists) {
-            const timeoutEmbed = new EmbedBuilder()
-              .setTitle("⏰ Session Expired")
-              .setDescription("You did not write a confession in time. This channel will be deleted.")
-              .setColor("#F4C16D");
-
-            await channel.send({ embeds: [timeoutEmbed] }).catch(() => {});
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            await channel.delete().catch(() => {});
-          }
-        } catch (err) {
-          console.error("confessions timeout error:", err);
-        }
-      });
+      // Auto cleanup after 5 minutes
+      setTimeout(() => {
+        client.removeListener("messageCreate", handleConfessionMessage);
+        console.log("⏰ Timeout: stopped listening for DM from", user.tag);
+      }, 5 * 60 * 1000);
     } catch (err) {
       console.error("confessions button error:", err);
       await interaction
         .editReply({
           content:
-            "Failed to create confession channel. Please try again.",
+            "Failed to start confession process. Please try again.",
         })
         .catch(() => {});
     }
