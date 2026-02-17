@@ -30,7 +30,7 @@ const complaints = () => {
     process.env.COMPLAINT_ADMIN_CHANNEL_ID || cfg.complaintAdminChannelId;
 
   // Send button message when bot starts
-  client.on("ready", async () => {
+  client.on("clientReady", async () => {
     try {
       if (!buttonChannelId) {
         console.warn("complaints: button channel ID not configured");

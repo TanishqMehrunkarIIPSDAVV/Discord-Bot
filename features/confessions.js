@@ -27,7 +27,7 @@ const confessions = () => {
     process.env.CONFESSION_OUTPUT_CHANNEL_ID || cfg.confessionOutputChannelId;
 
   // Send button message to input channel when bot starts
-  client.on("ready", async () => {
+  client.on("clientReady", async () => {
     try {
       if (!inputChannelId) return;
 
