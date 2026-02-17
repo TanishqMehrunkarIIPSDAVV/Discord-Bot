@@ -34,10 +34,7 @@ const confessions = () => {
       const channel = await client.channels
         .fetch(inputChannelId)
         .catch(() => null);
-      if (!channel) {
-        console.warn("confessions: input channel not found:", inputChannelId);
-        return;
-      }
+      if (!channel) return;
 
       const embed = new EmbedBuilder()
         .setTitle("📝 Share Your Confession")
@@ -69,7 +66,7 @@ const confessions = () => {
         await channel.send({ embeds: [embed], components: [row] }).catch(() => {});
       }
     } catch (err) {
-      console.error("confessions ready error:", err);
+      // Silent error handling
     }
   });
 
@@ -119,48 +116,43 @@ const confessions = () => {
       });
 
       // Listen for confession message using direct messageCreate event
+      let timeoutId;
+      let messageProcessed = false;
+
       const handleConfessionMessage = async (msg) => {
         // Filter: must be from this user, in DM, and not a bot
         if (msg.author.id !== user.id || msg.author.bot || !msg.channel.isDMBased()) {
           return;
         }
 
-        console.log("✅ MESSAGE RECEIVED in DM from", user.tag, "content:", msg.content.substring(0, 50));
+        // Prevent processing multiple messages
+        if (messageProcessed) return;
+        messageProcessed = true;
 
-        // Remove this listener
+        // Stop listening immediately after first message
         client.removeListener("messageCreate", handleConfessionMessage);
+        if (timeoutId) clearTimeout(timeoutId);
 
         try {
           const content = (msg.content || "").trim();
           const attachments = msg.attachments?.map((a) => a.url) || [];
 
-          console.log("📝 Content length:", content.length, "Attachments:", attachments.length);
-
           if (!content && attachments.length === 0) {
-            console.log("❌ Empty message");
-            await dmChannel.send("Your message was empty.").catch(console.error);
+            await dmChannel.send("❌ Your message was empty.").catch(() => {});
             return;
           }
 
           if (!outputChannelId) {
-            console.error("❌ NO OUTPUT CHANNEL ID SET");
-            await dmChannel.send("❌ System not configured").catch(console.error);
+            await dmChannel.send("❌ System not configured.").catch(() => {});
             return;
           }
 
-          console.log("🔍 Fetching output channel:", outputChannelId);
-          const outputChannel = await client.channels.fetch(outputChannelId).catch((err) => {
-            console.error("❌ FAILED TO FETCH CHANNEL:", err.message);
-            return null;
-          });
+          const outputChannel = await client.channels.fetch(outputChannelId).catch(() => null);
 
           if (!outputChannel) {
-            console.error("❌ CHANNEL NOT FOUND:", outputChannelId);
-            await dmChannel.send("❌ Channel not found: " + outputChannelId).catch(console.error);
+            await dmChannel.send("❌ Could not post your confession. Please contact an admin.").catch(() => {});
             return;
           }
-
-          console.log("✅ Channel fetched successfully");
 
           const embed = new EmbedBuilder()
             .setTitle("Anonymous Confession")
@@ -178,54 +170,50 @@ const confessions = () => {
             });
           }
 
-          console.log("📤 SENDING MESSAGE TO CHANNEL:", outputChannelId);
-          const sentMsg = await outputChannel.send({ embeds: [embed] }).catch((err) => {
-            console.error("❌ FAILED TO SEND MESSAGE:", err.message);
-            throw err;
+          await outputChannel.send({ embeds: [embed] }).catch(() => {
+            throw new Error("Failed to send confession");
           });
-          console.log("✅✅✅ MESSAGE SENT SUCCESSFULLY! ID:", sentMsg.id);
 
           // Send to admin channel
           if (adminChannelId) {
-            try {
-              console.log("📋 Sending to admin channel:", adminChannelId);
-              const adminChannel = await client.channels.fetch(adminChannelId).catch(() => null);
-              if (adminChannel) {
-                const adminEmbed = new EmbedBuilder()
-                  .setTitle("📋 Confession Report (Admin)")
-                  .setColor("#FF6B6B")
-                  .addFields(
-                    { name: "User", value: `${user.tag} (${user.id})`, inline: false },
-                    { name: "Content", value: content || "*No text*", inline: false }
-                  )
-                  .setTimestamp();
+            const adminChannel = await client.channels.fetch(adminChannelId).catch(() => null);
+            if (adminChannel) {
+              const adminEmbed = new EmbedBuilder()
+                .setTitle("📋 Confession Report (Admin)")
+                .setColor("#FF6B6B")
+                .addFields(
+                  { name: "User", value: `${user.tag} (${user.id})`, inline: false },
+                  { name: "Content", value: content.length > 1024 ? content.slice(0, 1021) + "..." : content || "*No text*", inline: false }
+                )
+                .setTimestamp();
 
-                await adminChannel.send({ embeds: [adminEmbed] }).catch(console.error);
-                console.log("✅ Admin notification sent");
+              if (attachments.length > 0) {
+                adminEmbed.addFields({
+                  name: `Attachments (${attachments.length})`,
+                  value: attachments.join("\n"),
+                });
               }
-            } catch (e) {
-              console.error("❌ Admin notify error:", e.message);
+
+              await adminChannel.send({ embeds: [adminEmbed] }).catch(() => {});
             }
           }
 
-          await dmChannel.send("✅ Your confession has been posted!").catch(console.error);
+          await dmChannel.send("✅ Your confession has been posted successfully!").catch(() => {});
         } catch (err) {
-          console.error("❌ PROCESSING ERROR:", err.message);
-          await dmChannel.send("❌ Error: " + err.message).catch(console.error);
+          await dmChannel.send("❌ An error occurred while posting your confession.").catch(() => {});
         }
       };
 
       // Register the listener
-      console.log("🎧 Listening for DM from:", user.tag);
       client.on("messageCreate", handleConfessionMessage);
 
       // Auto cleanup after 5 minutes
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
+        if (messageProcessed) return;
         client.removeListener("messageCreate", handleConfessionMessage);
-        console.log("⏰ Timeout: stopped listening for DM from", user.tag);
+        dmChannel.send("⏰ Session expired. You took too long to submit your confession.").catch(() => {});
       }, 5 * 60 * 1000);
     } catch (err) {
-      console.error("confessions button error:", err);
       await interaction
         .editReply({
           content:
