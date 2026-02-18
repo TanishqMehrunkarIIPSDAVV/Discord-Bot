@@ -423,12 +423,17 @@ const auditLogs = () => {
 
   // Helper to skip logging log channels
   const isLogChannel = (channelId) => Object.values(logIds).includes(channelId) || channelId === sharedFallback;
+  const isPrivateVoiceChannel = (channel) => {
+    if (!channel) return false;
+    return channel.type === ChannelType.GuildVoice && channel.name?.endsWith("-vc");
+  };
 
   // Channels
   client.on("channelCreate", async (channel) => {
     try {
       if (!channel.guild) return;
       if (isLogChannel(channel.id)) return;
+      if (isPrivateVoiceChannel(channel)) return;
       // Skip logging confession and complaint channels
       if (channel.name?.startsWith("confession-") || channel.name?.startsWith("complaint-")) return;
       const executor = await getExecutor(channel.guild, { types: AuditLogEvent.ChannelCreate, targetId: channel.id });
@@ -450,6 +455,7 @@ const auditLogs = () => {
     try {
       if (!channel.guild) return;
       if (isLogChannel(channel.id)) return;
+      if (isPrivateVoiceChannel(channel)) return;
       // Skip logging confession and complaint channels
       if (channel.name?.startsWith("confession-") || channel.name?.startsWith("complaint-")) return;
       const executor = await getExecutor(channel.guild, { types: AuditLogEvent.ChannelDelete, targetId: channel.id });
@@ -471,6 +477,7 @@ const auditLogs = () => {
     try {
       if (!newChannel.guild) return;
       if (isLogChannel(newChannel.id)) return;
+      if (isPrivateVoiceChannel(newChannel)) return;
       // Skip logging confession and complaint channels
       if (newChannel.name?.startsWith("confession-") || newChannel.name?.startsWith("complaint-")) return;
       const changes = [];

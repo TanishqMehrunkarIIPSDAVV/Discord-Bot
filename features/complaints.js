@@ -252,17 +252,38 @@ const complaints = () => {
         .reverse()
         .filter((m) => m.author.id !== client.user.id || m.content || m.embeds.length > 0);
 
-      // Generate transcript
+      const resolver = interaction.user;
+      const resolverLabel = resolver ? `${resolver.tag} (${resolver.id})` : "Unknown";
+      const createdAt = complaintChannel.createdAt
+        ? complaintChannel.createdAt
+        : new Date();
+      const resolvedAt = new Date();
+      const createdUnix = Math.floor(createdAt.getTime() / 1000);
+      const resolvedUnix = Math.floor(resolvedAt.getTime() / 1000);
+
+      // Generate transcript for file (UTC for clarity)
       let transcript = `COMPLAINT TRANSCRIPT\n`;
       transcript += `${"=".repeat(50)}\n\n`;
       transcript += `Ticket: ${complaintChannel.name}\n`;
       transcript += `User: ${complaintChannel.topic}\n`;
-      transcript += `Created: ${complaintChannel.createdAt.toLocaleString()}\n`;
-      transcript += `Resolved: ${new Date().toLocaleString()}\n\n`;
+      transcript += `Created (UTC): ${createdAt.toISOString()}\n`;
+      transcript += `Resolved (UTC): ${resolvedAt.toISOString()}\n`;
+      transcript += `Resolved By: ${resolverLabel}\n\n`;
       transcript += `${"=".repeat(50)}\n\n`;
 
+      // Generate transcript for DM (Discord renders in viewer timezone)
+      let renderedTranscript = `COMPLAINT TRANSCRIPT\n`;
+      renderedTranscript += `${"=".repeat(50)}\n\n`;
+      renderedTranscript += `Ticket: ${complaintChannel.name}\n`;
+      renderedTranscript += `User: ${complaintChannel.topic}\n`;
+      renderedTranscript += `Created: <t:${createdUnix}:F>\n`;
+      renderedTranscript += `Resolved: <t:${resolvedUnix}:F>\n`;
+      renderedTranscript += `Resolved By: ${resolverLabel}\n\n`;
+      renderedTranscript += `${"=".repeat(50)}\n\n`;
+
       for (const msg of sortedMessages) {
-        const timestamp = msg.createdAt.toLocaleString();
+        const timestampUnix = Math.floor(msg.createdTimestamp / 1000);
+        const timestamp = `<t:${timestampUnix}:f>`;
         const author = msg.author.tag;
         let content = msg.content || "";
 
@@ -279,7 +300,8 @@ const complaints = () => {
           }
         }
 
-        transcript += `[${timestamp}] ${author}:\n${content}\n\n`;
+        transcript += `[${new Date(msg.createdTimestamp).toISOString()}] ${author}:\n${content}\n\n`;
+        renderedTranscript += `[${timestamp}] ${author}:\n${content}\n\n`;
       }
 
       // Create attachment
@@ -288,19 +310,37 @@ const complaints = () => {
         name: `complaint_${complaintChannel.name}_${Date.now()}.txt`,
       });
 
+      const sendChunkedMessages = async (channel, text) => {
+        const maxLength = 1900;
+        let start = 0;
+        while (start < text.length) {
+          const chunk = text.slice(start, start + maxLength);
+          await channel.send(chunk).catch(() => {});
+          start += maxLength;
+        }
+      };
+
       // Send to user's DM
       const user = await client.users.fetch(userId).catch(() => null);
       if (user) {
         const dmEmbed = new EmbedBuilder()
           .setTitle("✅ Your Complaint Has Been Resolved")
           .setDescription(
-            `Your complaint ticket \`${complaintChannel.name}\` has been marked as resolved. Below is the transcript of all messages.`
+            `Your complaint ticket \`${complaintChannel.name}\` has been marked as resolved. The transcript below is shown in your local Discord time.`
           )
-          .setColor("#51CF66");
+          .setColor("#51CF66")
+          .addFields({
+            name: "Resolved By",
+            value: `${resolver.tag} (${resolver.id})`,
+            inline: true,
+          });
 
-        await user.send({ embeds: [dmEmbed], files: [attachment] }).catch((err) => {
-          console.error("Failed to send complaint transcript to user DM:", err);
-        });
+        const dmChannel = await user.createDM().catch(() => null);
+        if (dmChannel) {
+          await dmChannel.send({ embeds: [dmEmbed] }).catch(() => {});
+          await sendChunkedMessages(dmChannel, renderedTranscript);
+          await dmChannel.send({ files: [attachment] }).catch(() => {});
+        }
       }
 
       // Send to admin channel
@@ -311,18 +351,25 @@ const complaints = () => {
       if (adminChannel) {
         const adminEmbed = new EmbedBuilder()
           .setTitle("✅ Complaint Resolved")
-          .setDescription(`Complaint ticket \`${complaintChannel.name}\` has been resolved.`)
+          .setDescription(`Complaint ticket \`${complaintChannel.name}\` has been resolved. The transcript below is shown in local Discord time.`)
           .setColor("#51CF66")
-          .addFields({
-            name: "User",
-            value: `<@${userId}>`,
-            inline: true,
-          })
+          .addFields(
+            {
+              name: "User",
+              value: `<@${userId}>`,
+              inline: true,
+            },
+            {
+              name: "Resolved By",
+              value: `${resolver.tag} (${resolver.id})`,
+              inline: true,
+            }
+          )
           .setTimestamp();
 
-        await adminChannel
-          .send({ embeds: [adminEmbed], files: [attachment] })
-          .catch(() => {});
+        await adminChannel.send({ embeds: [adminEmbed] }).catch(() => {});
+        await sendChunkedMessages(adminChannel, renderedTranscript);
+        await adminChannel.send({ files: [attachment] }).catch(() => {});
       }
 
       // Update complaint display channel

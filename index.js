@@ -119,5 +119,7 @@ const confessions = require("./features/confessions");
 confessions();
 const complaints = require("./features/complaints");
 complaints();
+const privateVoice = require("./features/privateVoice");
+privateVoice();
 client.login(token);
 console.log('tested');
