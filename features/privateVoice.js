@@ -46,6 +46,7 @@ const privateVoice = () => {
 
   const ownerToChannel = new Map();
   const channelToOwner = new Map();
+  const channelToTrusted = new Map();
   const pendingAction = new Map();
 
   const getOwnedChannel = async (ownerId) => {
@@ -103,7 +104,18 @@ const privateVoice = () => {
         .setStyle(ButtonStyle.Secondary)
     );
 
-    return { embed, components: [row1, row2] };
+    const row3 = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId("pv_trust")
+        .setLabel("Trust User")
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId("pv_untrust")
+        .setLabel("Untrust User")
+        .setStyle(ButtonStyle.Primary)
+    );
+
+    return { embed, components: [row1, row2, row3] };
   };
 
   const sendControlPanel = async (channel) => {
@@ -179,6 +191,7 @@ const privateVoice = () => {
 
     ownerToChannel.set(state.id, channel.id);
     channelToOwner.set(channel.id, state.id);
+    channelToTrusted.set(channel.id, new Set());
 
     await sendControlPanel(channel);
     return channel;
@@ -195,6 +208,7 @@ const privateVoice = () => {
     const ownerId = channelToOwner.get(channelId);
     if (ownerId) ownerToChannel.delete(ownerId);
     channelToOwner.delete(channelId);
+    channelToTrusted.delete(channelId);
   };
 
   client.on("voiceStateUpdate", async (oldState, newState) => {
@@ -219,6 +233,7 @@ const privateVoice = () => {
     const ownerId = channelToOwner.get(channel.id);
     if (ownerId) ownerToChannel.delete(ownerId);
     channelToOwner.delete(channel.id);
+    channelToTrusted.delete(channel.id);
   });
 
   client.on("interactionCreate", async (interaction) => {
@@ -233,6 +248,8 @@ const privateVoice = () => {
             "pv_mute",
             "pv_deafen",
             "pv_disconnect",
+            "pv_trust",
+            "pv_untrust",
           ].includes(interaction.customId)
         ) {
           return;
@@ -268,6 +285,15 @@ const privateVoice = () => {
             ViewChannel: false,
             Connect: false,
           });
+
+          const trusted = channelToTrusted.get(ownedChannel.id) || new Set();
+          for (const userId of trusted) {
+            await ownedChannel.permissionOverwrites.edit(userId, {
+              ViewChannel: true,
+              Connect: true,
+            }).catch(() => {});
+          }
+
           await interaction.reply({ content: "Channel locked.", ephemeral: true });
           return;
         }
@@ -313,7 +339,7 @@ const privateVoice = () => {
           return;
         }
 
-        if (["pv_mute", "pv_deafen", "pv_disconnect"].includes(interaction.customId)) {
+        if (["pv_mute", "pv_deafen", "pv_disconnect", "pv_trust"].includes(interaction.customId)) {
           pendingAction.set(interaction.user.id, {
             action: interaction.customId,
             channelId: ownedChannel.id,
@@ -325,8 +351,41 @@ const privateVoice = () => {
             .setMinValues(1)
             .setMaxValues(1);
 
+          const contentMap = {
+            pv_trust: "Select a user to trust:",
+            pv_mute: "Select a user from your channel:",
+            pv_deafen: "Select a user from your channel:",
+            pv_disconnect: "Select a user from your channel:",
+          };
+
           await interaction.reply({
-            content: "Select a user from your channel:",
+            content: contentMap[interaction.customId] || "Select a user:",
+            components: [new ActionRowBuilder().addComponents(select)],
+            ephemeral: true,
+          });
+        }
+
+        if (interaction.customId === "pv_untrust") {
+          const trusted = channelToTrusted.get(ownedChannel.id) || new Set();
+          if (trusted.size === 0) {
+            await interaction.reply({ content: "No trusted users.", ephemeral: true });
+            return;
+          }
+
+          pendingAction.set(interaction.user.id, {
+            action: interaction.customId,
+            channelId: ownedChannel.id,
+          });
+
+          const select = new UserSelectMenuBuilder()
+            .setCustomId(`pv_user_select_${interaction.customId}`)
+            .setPlaceholder("Select a trusted user to untrust")
+            .setMinValues(1)
+            .setMaxValues(1);
+
+          const trustedList = Array.from(trusted).map(id => `<@${id}>`).join(", ");
+          await interaction.reply({
+            content: `Trusted users: ${trustedList}\n\nSelect a user to untrust:`,
             components: [new ActionRowBuilder().addComponents(select)],
             ephemeral: true,
           });
@@ -389,6 +448,31 @@ const privateVoice = () => {
         }
 
         const targetId = interaction.values[0];
+        
+        if (pending.action === "pv_trust") {
+          const trusted = channelToTrusted.get(channel.id) || new Set();
+          trusted.add(targetId);
+          channelToTrusted.set(channel.id, trusted);
+          
+          await channel.permissionOverwrites.edit(targetId, {
+            ViewChannel: true,
+            Connect: true,
+          }).catch(() => {});
+          
+          pendingAction.delete(interaction.user.id);
+          await interaction.reply({ content: `<@${targetId}> is now trusted and can see the VC.`, ephemeral: true });
+          return;
+        }
+
+        if (pending.action === "pv_untrust") {
+          const trusted = channelToTrusted.get(channel.id) || new Set();
+          trusted.delete(targetId);
+          await channel.permissionOverwrites.delete(targetId).catch(() => {});
+          pendingAction.delete(interaction.user.id);
+          await interaction.reply({ content: `<@${targetId}> is no longer trusted.`, ephemeral: true });
+          return;
+        }
+
         const member = channel.members.get(targetId);
         if (!member) {
           pendingAction.delete(interaction.user.id);
