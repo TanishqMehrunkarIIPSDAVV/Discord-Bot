@@ -9,6 +9,115 @@ const {
 
 let registered = false;
 
+const toUploadFile = async (attachment, index) => {
+  const response = await fetch(attachment.url);
+  if (!response.ok) {
+    throw new Error(`Failed to download attachment: ${attachment.url}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  const rawName = attachment.name || (() => {
+    try {
+      const pathname = new URL(attachment.url).pathname;
+      const fromUrl = pathname.split("/").pop();
+      return fromUrl ? decodeURIComponent(fromUrl) : "";
+    } catch {
+      return "";
+    }
+  })();
+
+  let fileName = rawName || `attachment-${index + 1}`;
+  if (!fileName.includes(".")) {
+    const contentType = response.headers.get("content-type") || "";
+    if (contentType.includes("image/gif")) fileName += ".gif";
+    else if (contentType.includes("image/png")) fileName += ".png";
+    else if (contentType.includes("image/jpeg")) fileName += ".jpg";
+    else if (contentType.includes("video/mp4")) fileName += ".mp4";
+  }
+
+  return {
+    attachment: Buffer.from(arrayBuffer),
+    name: fileName,
+  };
+};
+
+const getEmbedMediaUrls = (embeds) => {
+  const urls = [];
+  for (const embed of embeds || []) {
+    // Pick one best media URL per embed to avoid preview-image + video duplicates.
+    const imageUrl = embed?.image?.url;
+    const videoUrl = embed?.video?.url;
+    const pageUrl = embed?.url;
+
+    const isGifUrl = (url) => typeof url === "string" && /\.gif(\?|$)/i.test(url);
+
+    if (isGifUrl(imageUrl)) {
+      urls.push(imageUrl);
+      continue;
+    }
+
+    if (embed?.type === "gifv") {
+      if (isGifUrl(pageUrl)) {
+        urls.push(pageUrl);
+      } else if (videoUrl) {
+        urls.push(videoUrl);
+      } else if (imageUrl) {
+        urls.push(imageUrl);
+      }
+      continue;
+    }
+
+    if (videoUrl) {
+      urls.push(videoUrl);
+      continue;
+    }
+
+    if (imageUrl) {
+      urls.push(imageUrl);
+      continue;
+    }
+
+    if (embed?.thumbnail?.url) {
+      urls.push(embed.thumbnail.url);
+    }
+  }
+  return [...new Set(urls)];
+};
+
+const toUploadFileFromUrl = async (url, index) => {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to download embed media: ${url}`);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  let ext = "bin";
+
+  try {
+    const pathname = new URL(url).pathname;
+    const last = pathname.split("/").pop() || "";
+    const dot = last.lastIndexOf(".");
+    if (dot > -1 && dot < last.length - 1) {
+      ext = last.slice(dot + 1).toLowerCase();
+    }
+  } catch {}
+
+  if (ext === "bin") {
+    if (contentType.includes("image/gif")) ext = "gif";
+    else if (contentType.includes("image/png")) ext = "png";
+    else if (contentType.includes("image/jpeg")) ext = "jpg";
+    else if (contentType.includes("image/webp")) ext = "webp";
+    else if (contentType.includes("video/mp4")) ext = "mp4";
+    else if (contentType.includes("video/webm")) ext = "webm";
+    else if (contentType.includes("video/quicktime")) ext = "mov";
+  }
+
+  return {
+    attachment: Buffer.from(arrayBuffer),
+    name: `embed-media-${index + 1}.${ext}`,
+  };
+};
+
 const confessions = () => {
   if (registered) return;
   registered = true;
@@ -136,11 +245,17 @@ const confessions = () => {
         try {
           const content = (msg.content || "").trim();
           const attachments = [...(msg.attachments?.values() || [])];
-          const attachmentFiles = attachments.slice(0, 10).map((a, i) => ({
-            attachment: a.url,
-            name: a.name || `attachment-${i + 1}`,
-          }));
-          const incomingEmbeds = (msg.embeds || []).slice(0, 9).map((e) => e.toJSON());
+          const embedMediaUrls = attachments.length > 0 ? [] : getEmbedMediaUrls(msg.embeds || []);
+
+          const attachmentFiles = await Promise.all(
+            attachments.slice(0, 10).map((a, i) => toUploadFile(a, i))
+          );
+
+          const remainingSlots = Math.max(0, 10 - attachmentFiles.length);
+          const embedMediaFiles = await Promise.all(
+            embedMediaUrls.slice(0, remainingSlots).map((url, i) => toUploadFileFromUrl(url, i))
+          );
+          const incomingEmbeds = (msg.embeds || []).slice(0, 9);
 
           if (!content && attachments.length === 0 && incomingEmbeds.length === 0) {
             await dmChannel.send("❌ Your message was empty.").catch(() => {});
@@ -176,8 +291,8 @@ const confessions = () => {
           }
 
           await outputChannel.send({
-            embeds: [embed, ...incomingEmbeds],
-            files: attachmentFiles,
+            embeds: [embed],
+            files: [...attachmentFiles, ...embedMediaFiles],
           }).catch(() => {
             throw new Error("Failed to send confession");
           });
