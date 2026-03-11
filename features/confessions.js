@@ -135,9 +135,14 @@ const confessions = () => {
 
         try {
           const content = (msg.content || "").trim();
-          const attachments = msg.attachments?.map((a) => a.url) || [];
+          const attachments = [...(msg.attachments?.values() || [])];
+          const attachmentFiles = attachments.slice(0, 10).map((a, i) => ({
+            attachment: a.url,
+            name: a.name || `attachment-${i + 1}`,
+          }));
+          const incomingEmbeds = (msg.embeds || []).slice(0, 9).map((e) => e.toJSON());
 
-          if (!content && attachments.length === 0) {
+          if (!content && attachments.length === 0 && incomingEmbeds.length === 0) {
             await dmChannel.send("❌ Your message was empty.").catch(() => {});
             return;
           }
@@ -166,11 +171,14 @@ const confessions = () => {
           if (attachments.length > 0) {
             embed.addFields({
               name: `Attachments (${attachments.length})`,
-              value: attachments.join("\n"),
+              value: "Included below as files.",
             });
           }
 
-          await outputChannel.send({ embeds: [embed] }).catch(() => {
+          await outputChannel.send({
+            embeds: [embed, ...incomingEmbeds],
+            files: attachmentFiles,
+          }).catch(() => {
             throw new Error("Failed to send confession");
           });
 
@@ -183,14 +191,15 @@ const confessions = () => {
                 .setColor("#FF6B6B")
                 .addFields(
                   { name: "User", value: `${user.tag} (${user.id})`, inline: false },
-                  { name: "Content", value: content.length > 1024 ? content.slice(0, 1021) + "..." : content || "*No text*", inline: false }
+                  { name: "Content", value: content.length > 1024 ? content.slice(0, 1021) + "..." : content || "*No text*", inline: false },
+                  { name: "Embeds", value: String(incomingEmbeds.length), inline: true }
                 )
                 .setTimestamp();
 
               if (attachments.length > 0) {
                 adminEmbed.addFields({
                   name: `Attachments (${attachments.length})`,
-                  value: attachments.join("\n"),
+                  value: attachments.map((a) => a.url).join("\n"),
                 });
               }
 
