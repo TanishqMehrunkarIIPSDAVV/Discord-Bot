@@ -19,31 +19,66 @@ const YOUTUBE_HOSTS = new Set([
 ]);
 
 // ==================== FFmpeg Path Resolution ====================
-// Resolve ffmpeg-static to a path without spaces for Windows compatibility
+// Resolve ffmpeg path for cross-platform compatibility
 const getFFmpegPath = () => {
-  if (!ffmpegPath) return "ffmpeg";
-  if (!ffmpegPath.includes(" ")) return ffmpegPath;
+  // Try to find ffmpeg in common locations first (works on minimal Linux)
+  const commonPaths = [
+    "/usr/bin/ffmpeg",
+    "/usr/local/bin/ffmpeg",
+    "/bin/ffmpeg",
+  ];
 
-  // Try Windows short path first
+  for (const ffmpegPath of commonPaths) {
+    if (fs.existsSync(ffmpegPath)) {
+      console.log(`[FFmpeg] Found at: ${ffmpegPath}`);
+      return ffmpegPath;
+    }
+  }
+
+  // Try to find ffmpeg in PATH using sh (works on minimal Linux with /bin/sh)
   try {
-    const shortPath = execFileSync(
-      "cmd.exe",
-      ["/d", "/s", "/c", `for %I in ("${ffmpegPath}") do @echo %~sI`],
-      { encoding: "utf8", windowsHide: true }
-    ).trim();
-    if (shortPath && !shortPath.includes(" ")) return shortPath;
-  } catch {}
+    const result = require("child_process").execSync("/bin/sh -c 'command -v ffmpeg'", { encoding: "utf8" }).trim();
+    if (result) {
+      console.log(`[FFmpeg] Found in PATH: ${result}`);
+      return result;
+    }
+  } catch {
+    console.log(`[FFmpeg] Not found via 'command -v'`);
+  }
 
-  // Fallback: copy to path without spaces
-  try {
-    const noSpaceDir = path.join(path.parse(process.cwd()).root, "ctbot-bin");
-    const noSpacePath = path.join(noSpaceDir, "ffmpeg.exe");
-    if (!fs.existsSync(noSpaceDir)) fs.mkdirSync(noSpaceDir, { recursive: true });
-    if (!fs.existsSync(noSpacePath)) fs.copyFileSync(ffmpegPath, noSpacePath);
-    return noSpacePath;
-  } catch {}
+  // Try ffmpeg-static module (Windows)
+  if (ffmpegPath) {
+    console.log(`[FFmpeg] Using ffmpeg-static: ${ffmpegPath}`);
+    
+    if (!ffmpegPath.includes(" ")) {
+      return ffmpegPath;
+    }
 
-  return ffmpegPath;
+    // Try Windows short path first
+    try {
+      const shortPath = execFileSync(
+        "cmd.exe",
+        ["/d", "/s", "/c", `for %I in ("${ffmpegPath}") do @echo %~sI`],
+        { encoding: "utf8", windowsHide: true }
+      ).trim();
+      if (shortPath && !shortPath.includes(" ")) return shortPath;
+    } catch {}
+
+    // Fallback: copy to path without spaces
+    try {
+      const noSpaceDir = path.join(path.parse(process.cwd()).root, "ctbot-bin");
+      const noSpacePath = path.join(noSpaceDir, "ffmpeg.exe");
+      if (!fs.existsSync(noSpaceDir)) fs.mkdirSync(noSpaceDir, { recursive: true });
+      if (!fs.existsSync(noSpacePath)) fs.copyFileSync(ffmpegPath, noSpacePath);
+      return noSpacePath;
+    } catch {}
+
+    return ffmpegPath;
+  }
+
+  // Final fallback: try bare "ffmpeg" command
+  console.log(`[FFmpeg] Falling back to bare 'ffmpeg' command`);
+  return "ffmpeg";
 };
 
 // ==================== Voice Connection Management ====================
@@ -235,37 +270,68 @@ const resolveSearchCandidateToUrl = async (candidate) => {
     return candidate;
   }
 
-  const info = await ytDlpJson(candidate, {
-    dumpSingleJson: true,
-    noWarnings: true,
-    preferFreeFormats: true,
-    skipDownload: true,
-    simulate: true,
-  });
+  try {
+    // Build options for yt-dlp - just get the metadata, let DisTube handle formats
+    const ytDlpOptions = {
+      dumpSingleJson: true,
+      noWarnings: true,
+      skipDownload: true,
+      ignoreErrors: true,
+    };
 
-  const firstEntry = Array.isArray(info?.entries) ? info.entries.find((entry) => entry) : null;
-  const candidateUrl =
-    firstEntry?.webpage_url ||
-    firstEntry?.original_url ||
-    firstEntry?.url ||
-    info?.webpage_url ||
-    info?.original_url ||
-    info?.url;
-
-  let resolvedUrl = candidateUrl;
-
-  if (!resolvedUrl || !isYouTubeUrl(resolvedUrl)) {
-    const videoId = firstEntry?.id || info?.id;
-    if (videoId) {
-      resolvedUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    // Try to add cookies if file exists
+    const cookiesPath = path.join(__dirname, "..", "youtube_cookies.txt");
+    if (fs.existsSync(cookiesPath)) {
+      console.log(`[DisTube] Using cookies file: ${cookiesPath}`);
+      ytDlpOptions.cookies = cookiesPath;
+    } else {
+      console.log(`[DisTube] Cookies file not found at ${cookiesPath}, proceeding without cookies`);
     }
-  }
 
-  if (!resolvedUrl || !isYouTubeUrl(resolvedUrl)) {
-    throw new Error("Could not resolve YouTube URL from search query.");
-  }
+    const info = await ytDlpJson(candidate, ytDlpOptions);
 
-  return resolvedUrl;
+    // Check if search returned valid results
+    if (!info) {
+      throw new Error("No response from yt-dlp search.");
+    }
+
+    // Find first non-null entry with a valid ID
+    let firstEntry = null;
+    if (Array.isArray(info?.entries)) {
+      firstEntry = info.entries.find((entry) => entry && entry.id);
+    }
+    
+    // If no valid entry found, search had no results
+    if (!firstEntry && !info?.id) {
+      throw new Error("YouTube search returned no results.");
+    }
+
+    // Prefer the found entry, fall back to info object
+    const entry = firstEntry || info;
+    const videoId = entry?.id;
+
+    if (!videoId) {
+      throw new Error("Could not extract video ID from search results.");
+    }
+
+    // Construct YouTube watch URL - simple and always works
+    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    console.log(`[DisTube] Resolved search to: ${youtubeUrl}`);
+    return youtubeUrl;
+  } catch (err) {
+    // Log the detailed error but throw a generic one for candidates to skip
+    const errorMsg = err.message || String(err);
+    if (errorMsg.includes("Sign in to confirm") || errorMsg.includes("cookies") || errorMsg.includes("authentication")) {
+      console.warn(`[DisTube] YouTube auth required for: ${candidate}`);
+      console.warn(`[DisTube] Error details: ${errorMsg.substring(0, 200)}`);
+      throw new Error("YouTube signature verification required - skipping this candidate.");
+    }
+    if (errorMsg.includes("no results")) {
+      console.warn(`[DisTube] No search results for: ${candidate}`);
+      throw new Error("No search results found - skipping this candidate.");
+    }
+    throw err;
+  }
 };
 
 const resolveToYouTubeInput = async (input) => {
@@ -295,33 +361,31 @@ const resolveToYouTubeInput = async (input) => {
     }
 
     return {
-      url: `ytsearch1:${query}`,
-      candidates: buildYouTubeSearchCandidates(query),
+      url: `spsearch:${query}`,
       converted: true,
-      source: "external-url",
+      source: "spotify-url",
       query,
       title: query,
     };
   }
 
-  return {
-    url: `ytsearch1:${trimmed}`,
-    candidates: buildYouTubeSearchCandidates(trimmed),
-    converted: true,
-    source: "text-search",
-    query: trimmed,
-    title: trimmed,
-  };
+  // Plain text search is no longer supported
+  throw new Error(
+    `❌ Search functionality is disabled.\n\n` +
+    `✅ **Supported formats:**\n` +
+    `• **YouTube URLs:** \`ct play https://youtu.be/dQw4w9WgXcQ\`\n` +
+    `• **Spotify URLs:** \`ct play https://open.spotify.com/track/...\`\n\n` +
+    `📝 Only direct links work. No text search.`
+  );
 };
 
 // ==================== Play with Retry Logic ====================
 const playWithRetry = async (channel, input, message) => {
-  const candidateUrls = Array.isArray(input?.candidates) && input.candidates.length > 0
-    ? input.candidates
-    : [input?.url || String(input)];
+  // No more search candidates - just use the direct URL
+  const playUrl = input?.url || String(input);
   const existingQueue = distube.getQueue(message.guild.id);
 
-  console.log(`[DisTube] Play request: ${candidateUrls[0].substring(0, 50)}...`);
+  console.log(`[DisTube] Play request: ${playUrl.substring(0, 50)}...`);
   console.log(`[DisTube] Existing queue: ${existingQueue ? 'yes' : 'no'}`);
   
   // Only clear stale connections when starting fresh
@@ -334,56 +398,37 @@ const playWithRetry = async (channel, input, message) => {
   const maxRetries = 2;
   let lastError = null;
 
-  for (let i = 0; i < candidateUrls.length; i++) {
-    const candidate = candidateUrls[i];
-    let currentUrl = candidate;
-    if (!currentUrl) continue;
-
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      currentUrl = await resolveSearchCandidateToUrl(candidate);
+      console.log(`[DisTube] Play attempt ${attempt}/${maxRetries}`);
+
+      const voice = distube.voices.get(message.guild.id);
+      if (voice) {
+        setupConnectionDebug(voice.connection, message.guild.id);
+      }
+
+      await distube.play(channel, playUrl, {
+        message,
+        textChannel: message.channel,
+        member: message.member,
+      });
+
+      console.log(`[DisTube] Play successful on attempt ${attempt}`);
+      return;
     } catch (err) {
       lastError = err;
-      console.error(`[DisTube] Candidate ${i + 1} failed to resolve:`, err.message);
-      continue;
-    }
+      console.error(`[DisTube] Attempt ${attempt} failed:`, err.message);
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        console.log(`[DisTube] Play attempt ${attempt}/${maxRetries} with candidate ${i + 1}/${candidateUrls.length}`);
-
-        const voice = distube.voices.get(message.guild.id);
-        if (voice) {
-          setupConnectionDebug(voice.connection, message.guild.id);
+      if (err?.name === "DisTubeError" && err?.errorCode === "VOICE_CONNECT_FAILED") {
+        if (attempt < maxRetries) {
+          console.log(`[DisTube] Voice connection failed, retrying...`);
+          clearStaleVoiceConnection(message.guild.id);
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          continue;
         }
-
-        await distube.play(channel, currentUrl, {
-          message,
-          textChannel: message.channel,
-          member: message.member,
-        });
-
-        console.log(`[DisTube] Play successful on attempt ${attempt}`);
-        return;
-      } catch (err) {
-        lastError = err;
-        console.error(`[DisTube] Attempt ${attempt} failed:`, err.message);
-
-        if (err?.name === "DisTubeError" && err?.errorCode === "VOICE_CONNECT_FAILED") {
-          if (attempt < maxRetries) {
-            console.log(`[DisTube] Voice connection failed, retrying...`);
-            clearStaleVoiceConnection(message.guild.id);
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            continue;
-          }
-        }
-
-        if (err?.name === "DisTubeError" && err?.errorCode === "NO_RESULT" && i < candidateUrls.length - 1) {
-          console.log(`[DisTube] No result for candidate ${i + 1}, trying next candidate...`);
-          break;
-        }
-
-        throw err;
       }
+
+      throw err;
     }
   }
 
@@ -424,13 +469,13 @@ const distubeFunc = () => {
         case "play": {
           const input = args.join(" ");
           if (!input) {
-            return message.channel.send("❌ Gaane ka naam to de bsdk!!!");
+            return message.channel.send("❌ Please provide a YouTube or Spotify URL");
           }
 
           const resolved = await resolveToYouTubeInput(input);
 
-          if (resolved.converted && resolved.source === "external-url") {
-            message.channel.send(`🔎 Converted to YouTube: **${resolved.title || resolved.query}**`);
+          if (resolved.converted && resolved.source === "spotify-url") {
+            message.channel.send(`🔎 Converted Spotify to search: **${resolved.title || resolved.query}**`);
           }
 
           await playWithRetry(channel, resolved, message);
@@ -601,7 +646,7 @@ const distubeFunc = () => {
         case "help": {
           message.channel.send(
             `🎵 **Music Commands:**\n` +
-            `\`ct play <song/url>\` - Play a song\n` +
+            `\`ct play <url>\` - Play from YouTube/Spotify URL\n` +
             `\`ct pause\` - Pause the music\n` +
             `\`ct resume\` - Resume the music\n` +
             `\`ct skip\` - Skip current song\n` +
@@ -613,6 +658,9 @@ const distubeFunc = () => {
             `\`ct disconnect\` - Leave voice channel\n` +
             `\`ct vcdebug\` - Debug voice connection\n` +
             `\`ct vctest\` - Test voice connectivity\n\n` +
+            `📝 **Examples:**\n` +
+            `\`ct play https://youtu.be/dQw4w9WgXcQ\`\n` +
+            `\`ct play https://open.spotify.com/track/...\`\n\n` +
             `⚠️ **If music won't play:**\n` +
             `• Check Windows Firewall isn't blocking Node.js\n` +
             `• Disable VPN/Proxy temporarily\n` +

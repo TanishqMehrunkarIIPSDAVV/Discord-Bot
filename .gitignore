@@ -32,3 +32,7 @@ Thumbs.db
 
 # Generated YouTube player debug dumps
 *-player-script.js
+
+youtube_cookies.txt
+.cookies
+cookies.txt
