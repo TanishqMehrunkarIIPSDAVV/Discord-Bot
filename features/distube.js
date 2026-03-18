@@ -4,10 +4,19 @@ const { execFileSync } = require("node:child_process");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const { DisTube } = require("distube");
 const { SpotifyPlugin } = require("@distube/spotify");
-const { YtDlpPlugin } = require("@distube/yt-dlp");
+const { YtDlpPlugin, json: ytDlpJson } = require("@distube/yt-dlp");
 const { PermissionFlagsBits, ChannelType } = require("discord.js");
 const { getVoiceConnection, VoiceConnectionStatus } = require("@discordjs/voice");
 const ffmpegPath = require("ffmpeg-static");
+
+const YOUTUBE_HOSTS = new Set([
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "music.youtube.com",
+  "youtu.be",
+  "www.youtu.be",
+]);
 
 // ==================== FFmpeg Path Resolution ====================
 // Resolve ffmpeg-static to a path without spaces for Windows compatibility
@@ -132,7 +141,10 @@ const checkVoicePermissions = (message, channel) => {
     return `Missing permissions: ViewChannel, Connect, or Speak`;
   }
 
-  if (channel.full) {
+  const botChannelId = botMember.voice?.channelId;
+  const botAlreadyInTargetChannel = botChannelId === channel.id;
+
+  if (channel.full && !botAlreadyInTargetChannel) {
     return "That voice channel is full.";
   }
 
@@ -157,11 +169,159 @@ const distube = new DisTube(client, {
   emitAddListWhenCreatingQueue: true,
 });
 
+const isUrl = (value) => {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const isYouTubeUrl = (value) => {
+  if (!isUrl(value)) return false;
+  const { hostname } = new URL(value);
+  return YOUTUBE_HOSTS.has(hostname.toLowerCase());
+};
+
+const cleanSearchQuery = (value) =>
+  value
+    .replace(/\s*\[[^\]]*\]\s*/g, " ")
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const getSpotifyQuery = async (url) => {
+  try {
+    const response = await fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(url)}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    const title = typeof data?.title === "string" ? data.title : "";
+    const author = typeof data?.author_name === "string" ? data.author_name : "";
+    const combined = `${title} ${author}`.trim();
+    return combined || null;
+  } catch {
+    return null;
+  }
+};
+
+const deriveQueryFromUrl = (url) => {
+  try {
+    const parsed = new URL(url);
+    const pathParts = parsed.pathname.split("/").filter(Boolean);
+    const slug = pathParts[pathParts.length - 1] || "";
+    const decoded = decodeURIComponent(slug).replace(/\.[a-z0-9]+$/i, "");
+    return cleanSearchQuery(decoded) || null;
+  } catch {
+    return null;
+  }
+};
+
+const buildYouTubeSearchCandidates = (query) => {
+  const q = cleanSearchQuery(query);
+  if (!q) return [];
+
+  return [
+    `ytsearch1:${q}`,
+    `ytsearch5:${q}`,
+    `ytsearch1:${q} official audio`,
+    `ytsearch1:${q} lyrics`,
+  ];
+};
+
+const resolveSearchCandidateToUrl = async (candidate) => {
+  if (!candidate || !candidate.startsWith("ytsearch")) {
+    return candidate;
+  }
+
+  const info = await ytDlpJson(candidate, {
+    dumpSingleJson: true,
+    noWarnings: true,
+    preferFreeFormats: true,
+    skipDownload: true,
+    simulate: true,
+  });
+
+  const firstEntry = Array.isArray(info?.entries) ? info.entries.find((entry) => entry) : null;
+  const candidateUrl =
+    firstEntry?.webpage_url ||
+    firstEntry?.original_url ||
+    firstEntry?.url ||
+    info?.webpage_url ||
+    info?.original_url ||
+    info?.url;
+
+  let resolvedUrl = candidateUrl;
+
+  if (!resolvedUrl || !isYouTubeUrl(resolvedUrl)) {
+    const videoId = firstEntry?.id || info?.id;
+    if (videoId) {
+      resolvedUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    }
+  }
+
+  if (!resolvedUrl || !isYouTubeUrl(resolvedUrl)) {
+    throw new Error("Could not resolve YouTube URL from search query.");
+  }
+
+  return resolvedUrl;
+};
+
+const resolveToYouTubeInput = async (input) => {
+  const trimmed = String(input || "").trim();
+  if (!trimmed) {
+    throw new Error("Song name or URL is required.");
+  }
+
+  if (isYouTubeUrl(trimmed)) {
+    return { url: trimmed, converted: false, source: "youtube-url" };
+  }
+
+  if (isUrl(trimmed)) {
+    const host = new URL(trimmed).hostname.toLowerCase();
+    let query = null;
+
+    if (host.includes("spotify.com")) {
+      query = await getSpotifyQuery(trimmed);
+    }
+
+    if (!query) {
+      query = deriveQueryFromUrl(trimmed);
+    }
+
+    if (!query) {
+      throw new Error("Couldn't extract a searchable title from that URL.");
+    }
+
+    return {
+      url: `ytsearch1:${query}`,
+      candidates: buildYouTubeSearchCandidates(query),
+      converted: true,
+      source: "external-url",
+      query,
+      title: query,
+    };
+  }
+
+  return {
+    url: `ytsearch1:${trimmed}`,
+    candidates: buildYouTubeSearchCandidates(trimmed),
+    converted: true,
+    source: "text-search",
+    query: trimmed,
+    title: trimmed,
+  };
+};
+
 // ==================== Play with Retry Logic ====================
-const playWithRetry = async (channel, url, message) => {
+const playWithRetry = async (channel, input, message) => {
+  const candidateUrls = Array.isArray(input?.candidates) && input.candidates.length > 0
+    ? input.candidates
+    : [input?.url || String(input)];
   const existingQueue = distube.getQueue(message.guild.id);
-  
-  console.log(`[DisTube] Play request: ${url.substring(0, 50)}...`);
+
+  console.log(`[DisTube] Play request: ${candidateUrls[0].substring(0, 50)}...`);
   console.log(`[DisTube] Existing queue: ${existingQueue ? 'yes' : 'no'}`);
   
   // Only clear stale connections when starting fresh
@@ -173,40 +333,60 @@ const playWithRetry = async (channel, url, message) => {
 
   const maxRetries = 2;
   let lastError = null;
-  
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+
+  for (let i = 0; i < candidateUrls.length; i++) {
+    const candidate = candidateUrls[i];
+    let currentUrl = candidate;
+    if (!currentUrl) continue;
+
     try {
-      console.log(`[DisTube] Play attempt ${attempt}/${maxRetries}`);
-      
-      const voice = distube.voices.get(message.guild.id);
-      if (voice) {
-        setupConnectionDebug(voice.connection, message.guild.id);
-      }
-      
-      await distube.play(channel, url, {
-        message,
-        textChannel: message.channel,
-        member: message.member,
-      });
-      
-      console.log(`[DisTube] Play successful on attempt ${attempt}`);
-      return;
+      currentUrl = await resolveSearchCandidateToUrl(candidate);
     } catch (err) {
       lastError = err;
-      console.error(`[DisTube] Attempt ${attempt} failed:`, err.message);
-      
-      if (err?.name === "DisTubeError" && err?.errorCode === "VOICE_CONNECT_FAILED") {
-        if (attempt < maxRetries) {
-          console.log(`[DisTube] Voice connection failed, retrying...`);
-          clearStaleVoiceConnection(message.guild.id);
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-          continue;
+      console.error(`[DisTube] Candidate ${i + 1} failed to resolve:`, err.message);
+      continue;
+    }
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`[DisTube] Play attempt ${attempt}/${maxRetries} with candidate ${i + 1}/${candidateUrls.length}`);
+
+        const voice = distube.voices.get(message.guild.id);
+        if (voice) {
+          setupConnectionDebug(voice.connection, message.guild.id);
         }
+
+        await distube.play(channel, currentUrl, {
+          message,
+          textChannel: message.channel,
+          member: message.member,
+        });
+
+        console.log(`[DisTube] Play successful on attempt ${attempt}`);
+        return;
+      } catch (err) {
+        lastError = err;
+        console.error(`[DisTube] Attempt ${attempt} failed:`, err.message);
+
+        if (err?.name === "DisTubeError" && err?.errorCode === "VOICE_CONNECT_FAILED") {
+          if (attempt < maxRetries) {
+            console.log(`[DisTube] Voice connection failed, retrying...`);
+            clearStaleVoiceConnection(message.guild.id);
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            continue;
+          }
+        }
+
+        if (err?.name === "DisTubeError" && err?.errorCode === "NO_RESULT" && i < candidateUrls.length - 1) {
+          console.log(`[DisTube] No result for candidate ${i + 1}, trying next candidate...`);
+          break;
+        }
+
+        throw err;
       }
-      throw err;
     }
   }
-  
+
   throw lastError;
 };
 
@@ -242,12 +422,18 @@ const distubeFunc = () => {
     try {
       switch (command) {
         case "play": {
-          const url = args.join(" ");
-          if (!url) {
+          const input = args.join(" ");
+          if (!input) {
             return message.channel.send("❌ Gaane ka naam to de bsdk!!!");
           }
 
-          await playWithRetry(channel, url, message);
+          const resolved = await resolveToYouTubeInput(input);
+
+          if (resolved.converted && resolved.source === "external-url") {
+            message.channel.send(`🔎 Converted to YouTube: **${resolved.title || resolved.query}**`);
+          }
+
+          await playWithRetry(channel, resolved, message);
           break;
         }
 
@@ -374,7 +560,7 @@ const distubeFunc = () => {
           const queue = distube.getQueue(message);
           if (!queue) {
             clearStaleVoiceConnection(message.guild.id);
-            return message.channel.send("✅ Cleared any stale connections.");
+            message.channel.send("✅ Cleared any stale connections.");
           }
           distube.voices.leave(message);
           message.channel.send("👋 Disconnected from voice channel!");

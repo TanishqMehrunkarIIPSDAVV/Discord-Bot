@@ -7,10 +7,22 @@ const onReady=()=>
 {
     client.on(Events.ClientReady, () =>
     {
-        client.user.setActivity("Serving 𝑪𝒉𝒂𝒊 𝑻𝒂𝒑𝒓𝒊.𝒆𝒙𝒆 Server",
-        {
-          type: ActivityType.Watching,
+        const activities = [
+            "☕ Serving vibes at 𝑪𝒉𝒂𝒊 𝑻𝒂𝒑𝒓𝒊.𝒆𝒙𝒆",
+            "🤖 Powered by .exe extension energy",
+        ];
+
+        let activityIndex = 0;
+        client.user.setActivity(activities[activityIndex], {
+            type: ActivityType.Watching
         });
+
+        setInterval(() => {
+            activityIndex = (activityIndex + 1) % activities.length;
+            client.user.setActivity(activities[activityIndex], {
+                type: ActivityType.Watching
+            });
+        }, 15000);
         console.log('Ready!');
         
         // Initialize scheduled removals with slight delay to ensure full client readiness

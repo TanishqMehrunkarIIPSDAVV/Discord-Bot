@@ -1,4 +1,7 @@
 {
+  "scripts": {
+    "postinstall": "node scripts/patch-yt-dlp.js"
+  },
   "dependencies": {
     "@discordjs/voice": "^0.19.2",
     "@distube/spotify": "^2.0.2",

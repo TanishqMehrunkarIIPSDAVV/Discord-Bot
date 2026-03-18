@@ -1,5 +1,18 @@
 "use strict";
 
+const originalEmitWarning = process.emitWarning.bind(process);
+process.emitWarning = (warning, ...args) => {
+    const warningMessage = typeof warning === "string" ? warning : warning?.message || "";
+    const warningCode = typeof warning === "object" ? warning?.code : args[1];
+
+    // Suppress noisy third-party DEP0169 logs while keeping other warnings visible.
+    if (warningCode === "DEP0169" || warningMessage.includes("`url.parse()` behavior is not standardized")) {
+        return;
+    }
+
+    return originalEmitWarning(warning, ...args);
+};
+
 require("dotenv").config();
 
 const config = require('./config.json');
