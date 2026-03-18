@@ -1,10 +1,26 @@
 "use strict";
 
-const token = process.env.token || require('./config.json').token;
+require("dotenv").config();
+
+const config = require('./config.json');
+const token = (
+    process.env.DISCORD_TOKEN ||
+    process.env.TOKEN ||
+    process.env.token ||
+    config.token ||
+    ""
+).trim();
 const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection,GatewayIntentBits,Partials} = require('discord.js');
 const startServer=require("./server");
+
+if (!token) {
+    console.error(
+        "Missing Discord bot token. Set one of DISCORD_TOKEN/TOKEN env vars or add `token` in config.json."
+    );
+    process.exit(1);
+}
 
 const client = new Client(
 {
@@ -121,5 +137,8 @@ const complaints = require("./features/complaints");
 complaints();
 const privateVoice = require("./features/privateVoice");
 privateVoice();
-client.login(token);
+client.login(token).catch((err) => {
+    console.error("Failed to login Discord client:", err?.message || err);
+    process.exit(1);
+});
 console.log('tested');
