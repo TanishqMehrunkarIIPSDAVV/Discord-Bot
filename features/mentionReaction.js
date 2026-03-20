@@ -26,7 +26,7 @@ const mentionReaction = () => {
     // React only if the user is directly mentioned (not via role)
     if (message.mentions.users.has(TARGET_USER_ID_1)) {
       try {
-        await message.react("🍭");
+        await message.react("<:Tanishq_smile:1081643509456588811>");
       } catch (error) {
         console.error("Error reacting to mention:", error);
       }
