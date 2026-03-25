@@ -18,6 +18,8 @@ const YOUTUBE_HOSTS = new Set([
   "www.youtu.be",
 ]);
 
+const YTDLP_COOKIES_PATH = process.env.YTDLP_COOKIES_PATH || "/app/cookies.txt";
+
 // ==================== FFmpeg Path Resolution ====================
 // Resolve ffmpeg path for cross-platform compatibility
 const getFFmpegPath = () => {
@@ -227,7 +229,10 @@ const distube = new DisTube(client, {
   },
   plugins: [
     new SpotifyPlugin(),
-    new YtDlpPlugin({ update: true }),
+    new YtDlpPlugin({
+      update: true,
+      args: ["--cookies", YTDLP_COOKIES_PATH],
+    }),
   ],
   emitNewSongOnly: false,
   emitAddSongWhenCreatingQueue: true,
