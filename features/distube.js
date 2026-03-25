@@ -1,6 +1,6 @@
 const path = require("node:path");
 const fs = require("node:fs");
-const { execFileSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const { DisTube } = require("distube");
 const { SpotifyPlugin } = require("@distube/spotify");
@@ -21,23 +21,28 @@ const YOUTUBE_HOSTS = new Set([
 // ==================== FFmpeg Path Resolution ====================
 // Resolve ffmpeg path for cross-platform compatibility
 const getFFmpegPath = () => {
-  let resolvedPath = null;
+  const canRunFFmpeg = (candidatePath) => {
+    try {
+      if (!candidatePath || !fs.existsSync(candidatePath)) return false;
 
-  // 1. Try to use ffmpeg-static first (most reliable for hosted environments)
-  try {
-    if (ffmpegPath) {
-      if (fs.existsSync(ffmpegPath)) {
-        console.log(`[FFmpeg] Found ffmpeg-static at: ${ffmpegPath}`);
-        return ffmpegPath;
-      } else {
-        console.log(`[FFmpeg] ffmpeg-static path exists but is not a valid file: ${ffmpegPath}`);
+      // Hosted Linux can mount files without execute bit even when present.
+      if (process.platform !== "win32") {
+        try {
+          fs.chmodSync(candidatePath, 0o755);
+        } catch {}
       }
-    }
-  } catch (e) {
-    console.log(`[FFmpeg] Error checking ffmpeg-static: ${e.message}`);
-  }
 
-  // 2. Try to find ffmpeg in common Linux locations
+      const probe = spawnSync(candidatePath, ["-version"], {
+        stdio: "pipe",
+        windowsHide: true,
+      });
+      return probe.status === 0;
+    } catch {
+      return false;
+    }
+  };
+
+  // 1. Prefer system ffmpeg in hosted Linux environments.
   const commonPaths = [
     "/usr/bin/ffmpeg",
     "/usr/local/bin/ffmpeg",
@@ -45,13 +50,13 @@ const getFFmpegPath = () => {
   ];
 
   for (const checkPath of commonPaths) {
-    if (fs.existsSync(checkPath)) {
+    if (canRunFFmpeg(checkPath)) {
       console.log(`[FFmpeg] Found at: ${checkPath}`);
       return checkPath;
     }
   }
 
-  // 3. Try to find ffmpeg in PATH using which/command
+  // 2. Try to find ffmpeg in PATH using which/command
   try {
     let result;
     if (process.platform === "win32") {
@@ -59,12 +64,25 @@ const getFFmpegPath = () => {
     } else {
       result = require("child_process").execSync("which ffmpeg", { encoding: "utf8" }).trim();
     }
-    if (result && fs.existsSync(result)) {
+    if (result && canRunFFmpeg(result)) {
       console.log(`[FFmpeg] Found in PATH: ${result}`);
       return result;
     }
   } catch {
     console.log(`[FFmpeg] Not found in PATH`);
+  }
+
+  // 3. Try to use ffmpeg-static only if executable.
+  try {
+    if (ffmpegPath) {
+      if (canRunFFmpeg(ffmpegPath)) {
+        console.log(`[FFmpeg] Found ffmpeg-static at: ${ffmpegPath}`);
+        return ffmpegPath;
+      }
+      console.log(`[FFmpeg] ffmpeg-static found but not executable: ${ffmpegPath}`);
+    }
+  } catch (e) {
+    console.log(`[FFmpeg] Error checking ffmpeg-static: ${e.message}`);
   }
 
   // 4. Windows: Try to get short path from ffmpeg-static (avoids spaces issue)
@@ -75,7 +93,7 @@ const getFFmpegPath = () => {
         ["/d", "/s", "/c", `for %I in ("${ffmpegPath}") do @echo %~sI`],
         { encoding: "utf8", windowsHide: true }
       ).trim();
-      if (shortPath && fs.existsSync(shortPath)) return shortPath;
+      if (shortPath && canRunFFmpeg(shortPath)) return shortPath;
     } catch {}
 
     // Fallback: copy to path without spaces
@@ -84,7 +102,7 @@ const getFFmpegPath = () => {
       const noSpacePath = path.join(noSpaceDir, "ffmpeg.exe");
       if (!fs.existsSync(noSpaceDir)) fs.mkdirSync(noSpaceDir, { recursive: true });
       if (!fs.existsSync(noSpacePath)) fs.copyFileSync(ffmpegPath, noSpacePath);
-      return noSpacePath;
+      if (canRunFFmpeg(noSpacePath)) return noSpacePath;
     } catch {}
   }
 
