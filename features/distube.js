@@ -21,47 +21,61 @@ const YOUTUBE_HOSTS = new Set([
 // ==================== FFmpeg Path Resolution ====================
 // Resolve ffmpeg path for cross-platform compatibility
 const getFFmpegPath = () => {
-  // Try to find ffmpeg in common locations first (works on minimal Linux)
+  let resolvedPath = null;
+
+  // 1. Try to use ffmpeg-static first (most reliable for hosted environments)
+  try {
+    if (ffmpegPath) {
+      if (fs.existsSync(ffmpegPath)) {
+        console.log(`[FFmpeg] Found ffmpeg-static at: ${ffmpegPath}`);
+        return ffmpegPath;
+      } else {
+        console.log(`[FFmpeg] ffmpeg-static path exists but is not a valid file: ${ffmpegPath}`);
+      }
+    }
+  } catch (e) {
+    console.log(`[FFmpeg] Error checking ffmpeg-static: ${e.message}`);
+  }
+
+  // 2. Try to find ffmpeg in common Linux locations
   const commonPaths = [
     "/usr/bin/ffmpeg",
     "/usr/local/bin/ffmpeg",
     "/bin/ffmpeg",
   ];
 
-  for (const ffmpegPath of commonPaths) {
-    if (fs.existsSync(ffmpegPath)) {
-      console.log(`[FFmpeg] Found at: ${ffmpegPath}`);
-      return ffmpegPath;
+  for (const checkPath of commonPaths) {
+    if (fs.existsSync(checkPath)) {
+      console.log(`[FFmpeg] Found at: ${checkPath}`);
+      return checkPath;
     }
   }
 
-  // Try to find ffmpeg in PATH using sh (works on minimal Linux with /bin/sh)
+  // 3. Try to find ffmpeg in PATH using which/command
   try {
-    const result = require("child_process").execSync("/bin/sh -c 'command -v ffmpeg'", { encoding: "utf8" }).trim();
-    if (result) {
+    let result;
+    if (process.platform === "win32") {
+      result = execFileSync("where", ["ffmpeg"], { encoding: "utf8" }).trim().split("\n")[0];
+    } else {
+      result = require("child_process").execSync("which ffmpeg", { encoding: "utf8" }).trim();
+    }
+    if (result && fs.existsSync(result)) {
       console.log(`[FFmpeg] Found in PATH: ${result}`);
       return result;
     }
   } catch {
-    console.log(`[FFmpeg] Not found via 'command -v'`);
+    console.log(`[FFmpeg] Not found in PATH`);
   }
 
-  // Try ffmpeg-static module (Windows)
-  if (ffmpegPath) {
-    console.log(`[FFmpeg] Using ffmpeg-static: ${ffmpegPath}`);
-    
-    if (!ffmpegPath.includes(" ")) {
-      return ffmpegPath;
-    }
-
-    // Try Windows short path first
+  // 4. Windows: Try to get short path from ffmpeg-static (avoids spaces issue)
+  if (process.platform === "win32" && ffmpegPath) {
     try {
       const shortPath = execFileSync(
         "cmd.exe",
         ["/d", "/s", "/c", `for %I in ("${ffmpegPath}") do @echo %~sI`],
         { encoding: "utf8", windowsHide: true }
       ).trim();
-      if (shortPath && !shortPath.includes(" ")) return shortPath;
+      if (shortPath && fs.existsSync(shortPath)) return shortPath;
     } catch {}
 
     // Fallback: copy to path without spaces
@@ -72,12 +86,10 @@ const getFFmpegPath = () => {
       if (!fs.existsSync(noSpacePath)) fs.copyFileSync(ffmpegPath, noSpacePath);
       return noSpacePath;
     } catch {}
-
-    return ffmpegPath;
   }
 
-  // Final fallback: try bare "ffmpeg" command
-  console.log(`[FFmpeg] Falling back to bare 'ffmpeg' command`);
+  // 5. Final fallback: return bare "ffmpeg" command and let system find it
+  console.log(`[FFmpeg] Warning: Could not resolve ffmpeg path. Falling back to bare 'ffmpeg' command. This may fail on hosted sites without ffmpeg installed.`);
   return "ffmpeg";
 };
 
