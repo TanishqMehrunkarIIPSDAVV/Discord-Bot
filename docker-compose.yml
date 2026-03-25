@@ -1,0 +1,20 @@
+services:
+  discord-bot:
+    build: .
+    container_name: discord-bot
+    restart: unless-stopped
+    # Mount config.json if you need dynamic config changes without rebuild
+    volumes:
+      - ./config.json:/app/config.json
+      - ./cookies/cookies.txt:/app/cookies.txt:ro
+    # Load environment variables from .env file securely
+    env_file:
+      - .env
+    environment:
+      - PORT=3000
+      - NODE_ENV=production
+      - YTDLP_COOKIES_PATH=/app/cookies.txt
+    ports:
+      - "3000:3000"
+    # Essential for handling SIGTERM correctly for graceful shutdowns
+    stop_signal: SIGINT
