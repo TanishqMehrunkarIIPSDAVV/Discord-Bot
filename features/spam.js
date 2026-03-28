@@ -9,7 +9,6 @@ const messageContents = new Map();
 const EXCLUDED_USER_IDS = [
     // Add user IDs here to exclude them from spam timeout
     // Example: "123456789012345678",
-    "1002574512866480178",
     "936125585711845437"
 ];
 
