@@ -7,6 +7,7 @@ const {
   userMention,
   AuditLogEvent,
 } = require("discord.js");
+const { withDiscordNetworkRetry } = require("../utils/discordNetworkRetry");
 
 let registered = false;
 // Track last-seen member state to avoid logging stale/duplicate member updates
@@ -91,7 +92,19 @@ const auditLogs = () => {
     const channel = await fetchLogChannel(guild, kind);
     if (!channel) return;
     try {
-      await channel.send({ embeds: [embed.setTimestamp()] });
+      await withDiscordNetworkRetry(
+        () => channel.send({ embeds: [embed.setTimestamp()] }),
+        {
+          label: `audit-log-send:${kind}`,
+          retries: 3,
+          baseDelayMs: 1200,
+          onRetry: ({ error, attempt, retries, delayMs }) => {
+            console.warn(
+              `auditLogs: retry ${attempt}/${retries} (${kind}) in ${delayMs}ms (${error.code || error.message})`
+            );
+          },
+        }
+      );
     } catch (err) {
       console.error("auditLogs sendLog error:", err);
     }

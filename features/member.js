@@ -1,5 +1,6 @@
 const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
+const { withDiscordNetworkRetry } = require("../utils/discordNetworkRetry");
 
 const member = () => {
     // 🔹 Replace with your actual Role ID
@@ -13,7 +14,19 @@ const member = () => {
                 return;
             }
 
-            await member.roles.add(role);
+            await withDiscordNetworkRetry(
+                () => member.roles.add(role),
+                {
+                    label: "assign-role-on-join",
+                    retries: 3,
+                    baseDelayMs: 1200,
+                    onRetry: ({ error, attempt, retries, delayMs }) => {
+                        console.warn(
+                            `Role assign retry ${attempt}/${retries} in ${delayMs}ms (${error.code || error.message})`
+                        );
+                    },
+                }
+            );
             console.log(`Assigned role to ${member.user.tag}`);
         } catch (err) {
             console.error("Failed to assign role:", err);

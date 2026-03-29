@@ -1,6 +1,7 @@
 const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const { userMention, EmbedBuilder } = require("discord.js");
+const { withDiscordNetworkRetry } = require("../utils/discordNetworkRetry");
 
 const WELCOME_CHANNEL_ID = "1439533068208570420";
 const GOODBYE_CHANNEL_ID = "1439550592090505216";
@@ -33,7 +34,19 @@ const welcome = () => {
                 .setFooter({ text: "Enjoy your stay!", iconURL: member.guild.iconURL() })
                 .setTimestamp();
 
-            await channel.send({ embeds: [embed] });
+            await withDiscordNetworkRetry(
+                () => channel.send({ embeds: [embed] }),
+                {
+                    label: "welcome-embed-send",
+                    retries: 3,
+                    baseDelayMs: 1200,
+                    onRetry: ({ error, attempt, retries, delayMs }) => {
+                        console.warn(
+                            `welcome: retry ${attempt}/${retries} in ${delayMs}ms (${error.code || error.message})`
+                        );
+                    },
+                }
+            );
         } catch (err) {
             console.error("welcome: failed to send welcome embed", err);
         }
@@ -59,7 +72,19 @@ const welcome = () => {
                 .setFooter({ text: "Farewell!", iconURL: member.guild.iconURL() })
                 .setTimestamp();
 
-            await channel.send({ embeds: [embed] });
+            await withDiscordNetworkRetry(
+                () => channel.send({ embeds: [embed] }),
+                {
+                    label: "goodbye-embed-send",
+                    retries: 3,
+                    baseDelayMs: 1200,
+                    onRetry: ({ error, attempt, retries, delayMs }) => {
+                        console.warn(
+                            `welcome: goodbye retry ${attempt}/${retries} in ${delayMs}ms (${error.code || error.message})`
+                        );
+                    },
+                }
+            );
         } catch (err) {
             console.error("welcome: failed to send goodbye embed", err);
         }
