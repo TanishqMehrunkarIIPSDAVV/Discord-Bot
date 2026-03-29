@@ -152,6 +152,8 @@ const privateVoice = require("./features/privateVoice");
 privateVoice();
 const girlModApplication = require("./features/girlModApplication");
 girlModApplication();
+const announcement = require("./features/announcement");
+announcement();
 client.login(token).catch((err) => {
     console.error("Failed to login Discord client:", err?.message || err);
     process.exit(1);
