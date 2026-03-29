@@ -8,7 +8,7 @@ const announcement = () => {
         if (message.author.bot) return;
 
         // Check if message starts with "ct announcement"
-        if (!message.content.toLowerCase().startsWith('ct announcement ')) return;
+        if (!message.content.toLowerCase().startsWith('ct announce ')) return;
 
         try {
             // Check if user has admin permissions
@@ -19,7 +19,7 @@ const announcement = () => {
             }
 
             // Get the announcement text (everything after "ct announcement ")
-            const announcementText = message.content.slice('ct announcement '.length).trim();
+            const announcementText = message.content.slice('ct announce '.length).trim();
 
             if (!announcementText) {
                 return message.reply({
