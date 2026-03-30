@@ -152,6 +152,8 @@ const privateVoice = require("./features/privateVoice");
 privateVoice();
 const girlModApplication = require("./features/girlModApplication");
 girlModApplication();
+const boyModApplication = require("./features/boyModApplication");
+boyModApplication();
 const announcement = require("./features/announcement");
 announcement();
 client.login(token).catch((err) => {
