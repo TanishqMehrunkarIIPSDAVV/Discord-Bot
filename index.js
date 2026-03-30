@@ -154,6 +154,8 @@ const girlModApplication = require("./features/girlModApplication");
 girlModApplication();
 const boyModApplication = require("./features/boyModApplication");
 boyModApplication();
+const aiReply = require("./features/aiReply");
+aiReply();
 const announcement = require("./features/announcement");
 announcement();
 client.login(token).catch((err) => {

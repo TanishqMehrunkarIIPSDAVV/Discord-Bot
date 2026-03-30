@@ -1,6 +1,6 @@
 const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
-const { userMention, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
+const { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } = require("discord.js");
 
 const helpPages = [
     new EmbedBuilder()
@@ -8,8 +8,8 @@ const helpPages = [
         .setTitle("🤖 Help • Basics (1/3)")
         .setThumbnail('attachment://thumbnail.jpg')
         .setDescription(
-            `👋 **Quick start:** Mention me or type \`ct help\` to open this menu.\n\n` +
-            `**1.** </help:> / mention bot: Open help menu 📚\n` +
+            `👋 **Quick start:** Type \`ct help\` to open this menu.\n\n` +
+            `**1.** </help:> or \`ct help\`: Open help menu 📚\n` +
             `**2.** </ping:>: Bot latency 🏓\n` +
             `**3.** </avatar:>: View avatars 🔎\n` +
             `**4.** </user:>: User info (joined at) 🧾\n` +
@@ -55,7 +55,7 @@ const helpPages = [
 const help = () => {
     client.on("messageCreate", async (message) => {
         if (message.author.bot) return;
-        if (message.content.includes(`${userMention("1080879295586643978")}`) || message.content.toLowerCase() === "ct help") {
+        if (message.content.toLowerCase() === "ct help") {
             let page = 0;
             const getRow = (page) => new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
