@@ -158,6 +158,8 @@ const aiReply = require("./features/aiReply");
 aiReply();
 const announcement = require("./features/announcement");
 announcement();
+const revivalMentions = require("./features/revivalMentions");
+revivalMentions();
 client.login(token).catch((err) => {
     console.error("Failed to login Discord client:", err?.message || err);
     process.exit(1);

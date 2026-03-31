@@ -1,6 +1,7 @@
 const path = require("node:path");
 const fs = require("node:fs/promises");
 const client = require(`${path.dirname(__dirname)}/index.js`);
+const config = require("../config.json");
 const { Events } = require("discord.js");
 const { withDiscordNetworkRetry } = require("../utils/discordNetworkRetry");
 
@@ -19,6 +20,15 @@ const SYSTEM_PROMPT =
 
 const MAX_HISTORY_TURNS = Number(process.env.AI_HISTORY_TURNS || 8);
 const MAX_TRACKED_USERS = Number(process.env.AI_MAX_TRACKED_USERS || 500);
+const ALLOWED_AI_CHANNEL_IDS = new Set([
+    ...(process.env.AI_ALLOWED_CHANNEL_IDS || "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ...(Array.isArray(config.aiReplyChannelIds) ? config.aiReplyChannelIds : [])
+        .map((id) => String(id).trim())
+        .filter(Boolean),
+]);
 const userConversationHistory = new Map();
 const HISTORY_FILE_PATH = path.join(path.dirname(__dirname), "data", "ai-conversation-history.json");
 
@@ -54,6 +64,16 @@ function splitMessage(text, limit = 1900) {
 
     if (current.length) parts.push(current);
     return parts;
+}
+
+function isAllowedAiChannel(message) {
+    if (ALLOWED_AI_CHANNEL_IDS.size === 0) {
+        return true;
+    }
+
+    const channelId = message.channelId;
+    const parentId = message.channel?.parentId;
+    return ALLOWED_AI_CHANNEL_IDS.has(channelId) || (parentId && ALLOWED_AI_CHANNEL_IDS.has(parentId));
 }
 
 function getConversationKey(message) {
@@ -214,6 +234,7 @@ const aiReply = () => {
 
         const lower = message.content.toLowerCase().trim();
         if (lower === "ct help") return;
+        if (!isAllowedAiChannel(message)) return;
 
         const mentionedBot = message.mentions.users.has(client.user.id);
         const repliedToBot = await isReplyToBot(message);
