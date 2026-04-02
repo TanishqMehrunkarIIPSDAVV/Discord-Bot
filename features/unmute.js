@@ -40,7 +40,7 @@ const unmute = () => {
       await target.timeout(null, reason); // clears timeout
       message.channel.send(`${userMention(target.id)} has been unmuted. Reason: ${reason}`);
     } catch (err) {
-      console.error("Unmute error:", err);
+      console.error(`Unmute error for user ${target.user.tag} (${target.id}):`, err.message || err);
       return message.reply("Failed to unmute the user. Ensure I have Moderate Members permission and my role is high enough.");
     }
   });

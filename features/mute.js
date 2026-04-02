@@ -60,7 +60,7 @@ const mute = () => {
       await target.timeout(durationMs, reason);
       message.channel.send(`${userMention(target.id)} has been muted for ${minutes} minute(s). Reason: ${reason}`);
     } catch (err) {
-      console.error("Mute error:", err);
+      console.error(`Mute error for user ${target.user.tag} (${target.id}):`, err.message || err);
       return message.reply("Failed to mute the user. Ensure I have Moderate Members permission and my role is high enough.");
     }
   });

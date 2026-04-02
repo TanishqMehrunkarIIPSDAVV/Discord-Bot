@@ -199,9 +199,9 @@ const spam = () => {
             }
 
             await message.member.timeout(60000, reason);
-            await message.channel.send(`${userMention(userId)} has been timed out for spamming.`);
+            await message.channel.send(`${userMention(userId)} has been timed out for spamming. Reason: ${reason}`);
         } catch (err) {
-            console.error("Failed to timeout user:", err);
+            console.error(`Failed to timeout user ${message.author.tag} (${userId}):`, err.message || err);
         }
 
         // Clear to avoid repeated timeouts
