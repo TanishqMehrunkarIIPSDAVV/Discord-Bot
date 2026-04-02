@@ -90,7 +90,7 @@ async function sendWarning(message, reasons) {
 }
 
 function revivalMentions() {
-  client.on("ready", async () => {
+  client.on("clientReady", async () => {
     for (const guild of client.guilds.cache.values()) {
       const roles = await resolveTargetRoles(guild);
       await enforceNonMentionable(guild, roles);
