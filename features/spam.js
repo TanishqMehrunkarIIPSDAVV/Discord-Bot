@@ -2,19 +2,6 @@ const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const { userMention } = require("discord.js");
 
-const AI_API_URL = process.env.AI_API_URL || "https://openrouter.ai/api/v1/chat/completions";
-const AI_MODEL = process.env.AI_MODEL || "openai/gpt-4o-mini";
-const AI_API_KEY = (
-    process.env.OPENROUTER_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    process.env.AI_API_KEY ||
-    ""
-).trim();
-const AI_SPAM_CHECK_ENABLED = String(process.env.AI_SPAM_CHECK_ENABLED || "true").toLowerCase() !== "false";
-const AI_SPAM_MAX_CHARS = Number(process.env.AI_SPAM_MAX_CHARS || 1200);
-const AI_SPAM_MIN_CONFIDENCE = Number(process.env.AI_SPAM_MIN_CONFIDENCE || 0.85);
-const AI_SPAM_MIN_RECENT_COUNT = Number(process.env.AI_SPAM_MIN_RECENT_COUNT || 3);
-
 const messageTimestamps = new Map();
 const messageContents = new Map();
 
@@ -33,89 +20,6 @@ function normalizeMessageContent(value) {
         .trim();
 }
 
-function truncateForAi(value, limit = AI_SPAM_MAX_CHARS) {
-    const content = normalizeMessageContent(value);
-    if (content.length <= limit) return content;
-    return `${content.slice(0, Math.max(0, limit - 3)).trim()}...`;
-}
-
-function parseAiVerdict(rawContent) {
-    if (!rawContent) return null;
-
-    const cleaned = String(rawContent)
-        .trim()
-        .replace(/^```(?:json)?\s*/i, "")
-        .replace(/\s*```$/i, "");
-
-    const jsonStart = cleaned.indexOf("{");
-    const jsonEnd = cleaned.lastIndexOf("}");
-    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) return null;
-
-    try {
-        const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
-        if (typeof parsed?.spam !== "boolean") return null;
-        return {
-            spam: parsed.spam,
-            confidence: typeof parsed.confidence === "number" ? parsed.confidence : null,
-            reason: typeof parsed.reason === "string" ? parsed.reason.trim() : "",
-        };
-    } catch {
-        return null;
-    }
-}
-
-async function classifySpamWithAi(message, context) {
-    if (!AI_SPAM_CHECK_ENABLED || !AI_API_KEY) {
-        return null;
-    }
-
-    const content = normalizeMessageContent(message.content);
-    if (!content) {
-        return null;
-    }
-
-    const payload = {
-        model: AI_MODEL,
-        messages: [
-            {
-                role: "system",
-                content:
-                    "You are a Discord moderation assistant. Decide whether a message is spam. " +
-                    "Return only valid JSON with keys spam (boolean), confidence (number from 0 to 1), and reason (short string). " +
-                    "Mark spam=true for repeated messages, copy-paste floods, unsolicited promotion, excessive repeated characters, link dumping, or low-value spam. " +
-                    "Mark spam=false for normal chat, questions, short replies, and legitimate messages. Do not add markdown. " +
-                    "If the message is borderline, prefer spam=false unless the content is clearly repetitive, promotional, or low-value.",
-            },
-            {
-                role: "user",
-                content:
-                    `Message: ${truncateForAi(content, 600)}\n` +
-                    `Recent message count in 10s: ${context.recentCount}\n` +
-                    `Recent messages: ${truncateForAi(context.recentMessages.join(" | "), 700)}\n` +
-                    `Reply with JSON only.`,
-            },
-        ],
-        temperature: 0,
-    };
-
-    const response = await fetch(AI_API_URL, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${AI_API_KEY}`,
-        },
-        body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-        const body = await response.text().catch(() => "");
-        throw new Error(`AI spam request failed (${response.status}): ${body.slice(0, 200)}`);
-    }
-
-    const data = await response.json();
-    return parseAiVerdict(data?.choices?.[0]?.message?.content);
-}
-
 function detectSpamHeuristically(contents, filteredTimestamps) {
     const repeated = contents.length >= 4 && contents.slice(-4).every(c => c === contents[contents.length - 1]);
     const tooManyInWindow = filteredTimestamps.length > 5;
@@ -128,14 +32,39 @@ function detectSpamHeuristically(contents, filteredTimestamps) {
     };
 }
 
-function shouldTimeoutFromAiVerdict(aiVerdict, heuristic) {
-    if (!aiVerdict?.spam) return false;
+function buildValidReason(reason, fallback = "Spamming detected") {
+    const normalized = normalizeMessageContent(reason)
+        .replace(/[\u0000-\u001F\u007F]/g, "")
+        .trim();
 
-    const confidence = typeof aiVerdict.confidence === "number" ? aiVerdict.confidence : 0;
-    return (
-        confidence >= AI_SPAM_MIN_CONFIDENCE &&
-        heuristic.recentCount >= AI_SPAM_MIN_RECENT_COUNT
-    );
+    if (!normalized) {
+        return fallback;
+    }
+
+    // Discord timeout reason must be <= 512 chars.
+    return normalized.slice(0, 512);
+}
+
+function buildHeuristicReason(heuristic) {
+    if (!heuristic) {
+        return "Spamming detected";
+    }
+
+    const parts = [];
+
+    if (heuristic.repeated) {
+        parts.push("repeated messages detected");
+    }
+
+    if (heuristic.tooManyInWindow) {
+        parts.push(`${heuristic.recentCount} messages in 10 seconds`);
+    }
+
+    if (parts.length === 0) {
+        return "Spamming detected";
+    }
+
+    return `Spamming detected: ${parts.join("; ")}`;
 }
 
 const spam = () => {
@@ -178,43 +107,19 @@ const spam = () => {
 
         try {
             const heuristicSpam = heuristic.spam;
-
-            // Primary path: heuristic is the source of truth.
-            if (heuristicSpam) {
-                if (!message.member || message.member.communicationDisabledUntilTimestamp) {
-                    return;
-                }
-
-                await message.member.timeout(60000, "Spamming detected");
-                await message.channel.send(`${userMention(userId)} has been timed out for spamming. Reason: Spamming detected`);
-
-                // Clear to avoid repeated timeouts
-                messageTimestamps.set(userId, []);
-                messageContents.set(userId, []);
+            if (!heuristicSpam) {
                 return;
             }
 
-            // Backup path: AI only runs when heuristic did not flag spam.
-            const aiVerdict = await classifySpamWithAi(message, {
-                recentCount: heuristic.recentCount,
-                recentMessages: heuristic.recentMessages,
-            }).catch((err) => {
-                console.warn("AI spam check failed:", err.message || err);
-                return null;
-            });
-
-            const aiSpamWithEvidence = shouldTimeoutFromAiVerdict(aiVerdict, heuristic);
-            if (!aiSpamWithEvidence) {
-                return;
-            }
-
-            const reason = aiVerdict?.reason || "Spamming detected";
+            const dynamicReason = buildHeuristicReason(heuristic);
+            const timeoutReason = buildValidReason(dynamicReason, "Spamming detected");
+            const channelReason = buildValidReason(dynamicReason, "Spamming detected");
             if (!message.member || message.member.communicationDisabledUntilTimestamp) {
                 return;
             }
 
-            await message.member.timeout(60000, reason);
-            await message.channel.send(`${userMention(userId)} has been timed out for spamming. Reason: ${reason}`);
+            await message.member.timeout(60000, timeoutReason);
+            await message.channel.send(`${userMention(userId)} has been timed out for spamming. Reason: ${channelReason}`);
         } catch (err) {
             console.error(`Failed to timeout user ${message.author.tag} (${userId}):`, err.message || err);
         }
