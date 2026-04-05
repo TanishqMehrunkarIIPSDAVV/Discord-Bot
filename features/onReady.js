@@ -1,148 +1,92 @@
 const path=require("node:path");
 const client=require(`${path.dirname(__dirname)}/index.js`);
 const { ActivityType } = require("discord.js");
-
-const AI_API_URL = process.env.AI_API_URL || "https://openrouter.ai/api/v1/chat/completions";
-const AI_MODEL = process.env.AI_MODEL || "openai/gpt-4o-mini";
-const AI_API_KEY = (
-    process.env.OPENROUTER_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    process.env.AI_API_KEY ||
-    ""
-).trim();
-
-const ACTIVITY_REFRESH_MS = Number(process.env.AI_ACTIVITY_REFRESH_MS || 300000);
-const MAX_ACTIVITY_NAME_LENGTH = 120;
-const ACTIVITY_EMOJIS = ["✨", "🎧", "🎮", "🚀", "☕", "🎵", "🛠️", "🌟"];
+const MIN_ACTIVITY_REFRESH_MS = 60_000;
+const MAX_ACTIVITY_REFRESH_MS = 120_000;
 let activityRefreshTimer = null;
-let lastKnownGoodActivity = null;
-
-const fallbackActivities = [
-    "Serving chai and chaotic vibes ☕",
-    "Keeping the tapri running ✨",
-    "Debugging the universe 🛠️",
-    "Listening for pings 🎧",
-    "Watching over the server 👀",
-    "Powering your commands ⚡",
+const MODERATORS = [
+    { name: "Navya", id: "1358018305537085570" },
+    { name: "Bella", id: "1462895979052269890" },
+    { name: "Aditya", id: "508215254497624084" },
+    { name: "Deep", id: "308232106562158593" },
+    { name: "Dizzi", id: "936125585711845437" },
+    { name: "Rave", id: "1217740773173235774" },
+    { name: "Jay", id: "403132421765070848" },
+    { name: "Sunny", id: "518458685471588386" },
+    { name: "Rex", id: "443974289851678731" },
+    { name: "Tanishq", id: "779206329813696522" },
 ];
 
-function sanitizeActivityName(value) {
-    if (!value) return "Serving fresh vibes";
-    return String(value)
-        .replace(/[\r\n\t]+/g, " ")
-        .replace(/\s{2,}/g, " ")
-        .trim()
-        .slice(0, MAX_ACTIVITY_NAME_LENGTH);
+function randomModName() {
+    if (!MODERATORS.length) return "Mod";
+    const index = Math.floor(Math.random() * MODERATORS.length);
+    return MODERATORS[index].name;
 }
 
-function hasEmoji(value) {
-    if (!value) return false;
-    return /\p{Extended_Pictographic}/u.test(value);
+const activities = [
+    { text: () => `${randomModName()} is guarding the tapri gate 🛡️`, type: ActivityType.Watching },
+    { text: () => `${randomModName()} is carrying the mod queue today ⚡`, type: ActivityType.Playing },
+    { text: () => `${randomModName()} is checking reports with chai ☕`, type: ActivityType.Listening },
+    { text: () => `${randomModName()} is on meme patrol duty 👀`, type: ActivityType.Watching },
+    { text: () => `${randomModName()} is cleaning the chat timeline 🧹`, type: ActivityType.Playing },
+    { text: () => `${randomModName()} is handling pings like a pro 🎯`, type: ActivityType.Competing },
+    { text: () => `${randomModName()} is reviewing mod tickets 📋`, type: ActivityType.Listening },
+    { text: () => `${randomModName()} is running the tapri shift 🚀`, type: ActivityType.Playing },
+    { text: () => `${randomModName()} is spotting rule breaks fast 🔍`, type: ActivityType.Watching },
+    { text: () => `${randomModName()} is calming chaos with style 😎`, type: ActivityType.Listening },
+    { text: () => `${randomModName()} is keeping the vibes wholesome ✨`, type: ActivityType.Playing },
+    { text: () => `${randomModName()} is defending peace in chat 🤝`, type: ActivityType.Watching },
+    { text: () => `${randomModName()} is listening for trouble pings 🎧`, type: ActivityType.Listening },
+    { text: () => `${randomModName()} is in full moderator mode 🔥`, type: ActivityType.Playing },
+    { text: () => `${randomModName()} is watching over Chai Tapri.exe 🌟`, type: ActivityType.Watching },
+    { text: () => `${randomModName()} is building a safer community 🛠️`, type: ActivityType.Competing },
+    { text: () => `${randomModName()} is checking mod logs right now 📚`, type: ActivityType.Listening },
+    { text: () => `${randomModName()} is carrying team discipline 🎮`, type: ActivityType.Playing },
+    { text: () => `${randomModName()} is patrolling channels nonstop 📈`, type: ActivityType.Watching },
+    { text: () => `${randomModName()} is serving mod energy all day ☕`, type: ActivityType.Playing },
+];
+
+let activityIndex = 0;
+
+function randomRefreshDelay() {
+    return MIN_ACTIVITY_REFRESH_MS + Math.floor(Math.random() * (MAX_ACTIVITY_REFRESH_MS - MIN_ACTIVITY_REFRESH_MS + 1));
 }
 
-function randomEmoji() {
-    const index = Math.floor(Math.random() * ACTIVITY_EMOJIS.length);
-    return ACTIVITY_EMOJIS[index] || "✨";
-}
-
-function ensureEmoji(value) {
-    const activity = sanitizeActivityName(value);
-    if (hasEmoji(activity)) return activity;
-
-    // Keep total length bounded when appending an emoji.
-    const truncated = activity.slice(0, Math.max(0, MAX_ACTIVITY_NAME_LENGTH - 3)).trim();
-    return `${truncated} ${randomEmoji()}`.trim();
-}
-
-function ensureNonEmptyActivity(value) {
-    const activity = ensureEmoji(value);
-    return activity || randomFallbackActivity();
-}
-
-function randomFallbackActivity() {
-    const index = Math.floor(Math.random() * fallbackActivities.length);
-    return fallbackActivities[index] || "Serving fresh vibes";
-}
-
-function randomActivityType() {
-    const types = [ActivityType.Playing, ActivityType.Watching, ActivityType.Listening];
-    return types[Math.floor(Math.random() * types.length)] || ActivityType.Watching;
-}
-
-async function generateAiActivity() {
-    if (!AI_API_KEY) {
-        return randomFallbackActivity();
+function pickNextActivity() {
+    if (!activities.length) {
+        return { text: "Serving fresh vibes ☕", type: ActivityType.Watching };
     }
 
-    const prompt =
-        "Generate exactly one short Discord bot activity line (max 60 chars). " +
-        "Keep it friendly and SFW, no hashtags, no quotes. Include at least one emoji. " +
-        "Only return the activity text and nothing else.";
-
-    const payload = {
-        model: AI_MODEL,
-        messages: [
-            {
-                role: "system",
-                content:
-                    "You write short, creative Discord bot status lines that are always safe and non-violent.",
-            },
-            {
-                role: "user",
-                content: `${prompt} Make it different from common defaults.`,
-            },
-        ],
-        temperature: 1,
+    const activity = activities[activityIndex % activities.length];
+    activityIndex = (activityIndex + 1) % activities.length;
+    return {
+        text: typeof activity.text === "function" ? activity.text() : activity.text,
+        type: activity.type,
     };
-
-    const response = await fetch(AI_API_URL, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${AI_API_KEY}`,
-        },
-        body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-        const body = await response.text().catch(() => "");
-        throw new Error(`AI activity request failed (${response.status}): ${body.slice(0, 200)}`);
-    }
-
-    const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content;
-    return ensureEmoji(content);
 }
 
-async function setFreshActivity() {
-    const type = randomActivityType();
+function applyActivity(activity) {
+    client.user.setActivity(activity.text, { type: activity.type });
+    console.log(`[Presence] Activity updated: ${activity.text}`);
+}
 
-    try {
-        const aiActivity = ensureNonEmptyActivity(await generateAiActivity());
-        lastKnownGoodActivity = aiActivity;
-        client.user.setActivity(aiActivity, { type });
-        console.log(`[Presence] Activity updated: ${aiActivity}`);
-    } catch (error) {
-        const fallback = ensureNonEmptyActivity(lastKnownGoodActivity || randomFallbackActivity());
-        lastKnownGoodActivity = fallback;
-        client.user.setActivity(fallback, { type: ActivityType.Watching });
-        console.warn("[Presence] AI activity failed, using fallback:", error.message || error);
+function scheduleNextActivityUpdate() {
+    if (activityRefreshTimer) {
+        clearTimeout(activityRefreshTimer);
     }
+
+    activityRefreshTimer = setTimeout(() => {
+        applyActivity(pickNextActivity());
+        scheduleNextActivityUpdate();
+    }, randomRefreshDelay());
 }
 
 const onReady=()=>
 {
     client.once("clientReady", async () =>
     {
-        const startupFallback = ensureNonEmptyActivity(lastKnownGoodActivity || randomFallbackActivity());
-        lastKnownGoodActivity = startupFallback;
-        client.user.setActivity(startupFallback, { type: ActivityType.Watching });
-
-        await setFreshActivity();
-        if (activityRefreshTimer) {
-            clearInterval(activityRefreshTimer);
-        }
-        activityRefreshTimer = setInterval(setFreshActivity, ACTIVITY_REFRESH_MS);
+        applyActivity(pickNextActivity());
+        scheduleNextActivityUpdate();
         console.log('Ready!');
         
         // Initialize scheduled removals with slight delay to ensure full client readiness
