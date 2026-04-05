@@ -177,19 +177,34 @@ const spam = () => {
         const heuristic = detectSpamHeuristically(contents, filteredTimestamps);
 
         try {
+            const heuristicSpam = heuristic.spam;
+
+            // Primary path: heuristic is the source of truth.
+            if (heuristicSpam) {
+                if (!message.member || message.member.communicationDisabledUntilTimestamp) {
+                    return;
+                }
+
+                await message.member.timeout(60000, "Spamming detected");
+                await message.channel.send(`${userMention(userId)} has been timed out for spamming. Reason: Spamming detected`);
+
+                // Clear to avoid repeated timeouts
+                messageTimestamps.set(userId, []);
+                messageContents.set(userId, []);
+                return;
+            }
+
+            // Backup path: AI only runs when heuristic did not flag spam.
             const aiVerdict = await classifySpamWithAi(message, {
                 recentCount: heuristic.recentCount,
                 recentMessages: heuristic.recentMessages,
             }).catch((err) => {
-                console.warn("AI spam check failed, falling back to heuristic:", err.message || err);
+                console.warn("AI spam check failed:", err.message || err);
                 return null;
             });
 
-            const heuristicSpam = heuristic.spam;
             const aiSpamWithEvidence = shouldTimeoutFromAiVerdict(aiVerdict, heuristic);
-            const shouldTimeout = heuristicSpam || aiSpamWithEvidence;
-
-            if (!shouldTimeout) {
+            if (!aiSpamWithEvidence) {
                 return;
             }
 
