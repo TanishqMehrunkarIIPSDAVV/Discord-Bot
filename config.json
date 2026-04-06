@@ -16,6 +16,11 @@
   "complaintAdminChannelId": "1473331580972961905",
   "confessionAdminChannelId": "1473348273111568455",
   "privateVcTriggerChannelId": "1473620278759133194",
+  "vcAutoDisconnectEnabled": true,
+  "blockedVcUserIds": [
+    "1431614444407885824",
+    "986665797499908196"
+  ],
   "aiReplyChannelIds": [
     "1488558127736426527"
   ],

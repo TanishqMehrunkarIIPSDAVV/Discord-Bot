@@ -8,6 +8,7 @@ const {
   AuditLogEvent,
 } = require("discord.js");
 const { withDiscordNetworkRetry } = require("../utils/discordNetworkRetry");
+const { shouldSuppressVoiceLog } = require("../utils/voiceModerationState");
 
 let registered = false;
 // Track last-seen member state to avoid logging stale/duplicate member updates
@@ -521,6 +522,8 @@ const auditLogs = () => {
     if (!guild) return;
 
     const userId = newState.id || oldState.id;
+    if (shouldSuppressVoiceLog(userId)) return;
+
     const logChan = await fetchLogChannel(guild, "voice");
     if (!logChan) return;
 
