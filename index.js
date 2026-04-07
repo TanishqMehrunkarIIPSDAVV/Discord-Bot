@@ -132,6 +132,8 @@ const ban = require("./features/ban");
 ban();
 const mute = require("./features/mute");
 mute();
+const warn = require("./features/warn");
+warn();
 const unmute = require("./features/unmute");
 unmute();
 const unban = require("./features/unban");

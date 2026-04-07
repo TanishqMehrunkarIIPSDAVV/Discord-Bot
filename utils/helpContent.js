@@ -93,6 +93,8 @@ const getHelpPages = () => {
             `• \`ct unban <userId> [reason]\` Remove ban\n` +
             `• \`ct mute <user> [minutes] [reason]\` Timeout member\n` +
             `• \`ct unmute <user> [reason]\` Remove timeout\n` +
+            `• \`ct warn <user> [reason]\` Add a warning\n` +
+            `• \`ct clearwarn <user>\` Clear all warns for a user\n` +
             `• \`ct lock\` Lock this channel for configured lock roles\n` +
             `• \`ct unlock\` Unlock this channel for configured lock roles\n\n` +
             `🎛️ **Server Tools**\n` +
