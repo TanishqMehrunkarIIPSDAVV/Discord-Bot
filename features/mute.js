@@ -1,6 +1,7 @@
 const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const { userMention, PermissionFlagsBits } = require("discord.js");
+const { createCase } = require("../utils/caseStore");
 
 const MAX_TIMEOUT_MS = 28 * 24 * 60 * 60 * 1000; // Discord limit ~28 days
 
@@ -58,6 +59,14 @@ const mute = () => {
       ).catch(() => null);
 
       await target.timeout(durationMs, reason);
+      createCase({
+        guildId: message.guild.id,
+        type: "mute",
+        actorId: message.author.id,
+        targetUserId: target.id,
+        reason,
+        details: { minutes },
+      });
       message.channel.send(`${userMention(target.id)} has been muted for ${minutes} minute(s). Reason: ${reason}`);
     } catch (err) {
       console.error(`Mute error for user ${target.user.tag} (${target.id}):`, err.message || err);

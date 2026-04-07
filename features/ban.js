@@ -1,6 +1,7 @@
 const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const { userMention, PermissionFlagsBits } = require("discord.js");
+const { createCase } = require("../utils/caseStore");
 
 const ban = () => {
   client.on("messageCreate", async (message) => {
@@ -58,6 +59,14 @@ const ban = () => {
 
       // Ban user by ID directly
       await message.guild.members.ban(targetId, { reason });
+
+      createCase({
+        guildId: message.guild.id,
+        type: "ban",
+        actorId: message.author.id,
+        targetUserId: targetId,
+        reason,
+      });
 
       // Fetch the banned user and emit guildBanAdd event for logging
       try {

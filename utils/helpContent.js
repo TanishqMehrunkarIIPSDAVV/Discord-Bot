@@ -101,6 +101,12 @@ const getHelpPages = () => {
             `• \`ct unmute <user> [reason]\` Remove timeout\n` +
             `• \`ct warn <user> [reason]\` Add a warning\n` +
             `• \`ct clearwarn <user>\` Clear all warns for a user\n` +
+            `• \`ct warninfo <user>\` Show warn count for one user\n` +
+            `• \`ct warnings\` Show all users with warns\n` +
+            `• \`ct case <id|user>\` Show one case (by ID or latest for user)\n` +
+            `• \`ct cases [user]\` List cases with pagination\n` +
+            `• \`ct cases type:warn\` Filter cases by type\n` +
+            `• \`ct cases moderator:@user\` Filter cases by moderator\n` +
             `• \`ct lock\` Lock this channel for configured lock roles\n` +
             `• \`ct unlock\` Unlock this channel for configured lock roles\n\n` +
             `🎛️ **Server Tools**\n` +

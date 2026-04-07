@@ -1,0 +1,160 @@
+{
+  "nextCaseId": 13,
+  "guilds": {
+    "714168295854440570": {
+      "cases": [
+        {
+          "id": 1,
+          "guildId": "714168295854440570",
+          "type": "warn",
+          "actorId": "779206329813696522",
+          "targetUserId": "1449846174768169112",
+          "reason": "testing",
+          "details": {
+            "warnsAfter": 1
+          },
+          "createdAt": 1775597099053
+        },
+        {
+          "id": 2,
+          "guildId": "714168295854440570",
+          "type": "vc-move",
+          "actorId": "779206329813696522",
+          "targetUserId": "518458685471588386",
+          "reason": "Moved from 𝑪𝒉𝒖𝒄𝒉𝒆 𝑽𝑪 to 𝑪𝒉𝒊𝒍𝒍𝒊𝒏𝒈 𝑽𝑪",
+          "details": {
+            "fromChannelId": "1439528457930543135",
+            "toChannelId": "1439526437110415480",
+            "movedCount": 2
+          },
+          "createdAt": 1775597441728
+        },
+        {
+          "id": 3,
+          "guildId": "714168295854440570",
+          "type": "vc-move",
+          "actorId": "779206329813696522",
+          "targetUserId": "779206329813696522",
+          "reason": "Moved from 𝑪𝒉𝒖𝒄𝒉𝒆 𝑽𝑪 to 𝑪𝒉𝒊𝒍𝒍𝒊𝒏𝒈 𝑽𝑪",
+          "details": {
+            "fromChannelId": "1439528457930543135",
+            "toChannelId": "1439526437110415480",
+            "movedCount": 2
+          },
+          "createdAt": 1775597441729
+        },
+        {
+          "id": 4,
+          "guildId": "714168295854440570",
+          "type": "warn",
+          "actorId": "779206329813696522",
+          "targetUserId": "1449846174768169112",
+          "reason": "No reason provided",
+          "details": {
+            "warnsAfter": 2
+          },
+          "createdAt": 1775597537280
+        },
+        {
+          "id": 5,
+          "guildId": "714168295854440570",
+          "type": "clearwarn",
+          "actorId": "779206329813696522",
+          "targetUserId": "1449846174768169112",
+          "reason": "Warns cleared",
+          "details": {
+            "previousWarns": 2
+          },
+          "createdAt": 1775597555377
+        },
+        {
+          "id": 6,
+          "guildId": "714168295854440570",
+          "type": "warn",
+          "actorId": "779206329813696522",
+          "targetUserId": "1449846174768169112",
+          "reason": "No reason provided",
+          "details": {
+            "warnsAfter": 1
+          },
+          "createdAt": 1775597566337
+        },
+        {
+          "id": 7,
+          "guildId": "714168295854440570",
+          "type": "warn",
+          "actorId": "779206329813696522",
+          "targetUserId": "1449846174768169112",
+          "reason": "testing",
+          "details": {
+            "warnsAfter": 2
+          },
+          "createdAt": 1775597594787
+        },
+        {
+          "id": 8,
+          "guildId": "714168295854440570",
+          "type": "warn",
+          "actorId": "779206329813696522",
+          "targetUserId": "1449846174768169112",
+          "reason": "testing",
+          "details": {
+            "warnsAfter": 3
+          },
+          "createdAt": 1775597925432
+        },
+        {
+          "id": 9,
+          "guildId": "714168295854440570",
+          "type": "clearwarn",
+          "actorId": "779206329813696522",
+          "targetUserId": "1449846174768169112",
+          "reason": "Warns cleared",
+          "details": {
+            "previousWarns": 3
+          },
+          "createdAt": 1775597944484
+        },
+        {
+          "id": 10,
+          "guildId": "714168295854440570",
+          "type": "mute",
+          "actorId": "779206329813696522",
+          "targetUserId": "1462895979052269890",
+          "reason": "No reason provided",
+          "details": {
+            "minutes": 10
+          },
+          "createdAt": 1775598449765
+        },
+        {
+          "id": 11,
+          "guildId": "714168295854440570",
+          "type": "vc-drag",
+          "actorId": "779206329813696522",
+          "targetUserId": "1462895979052269890",
+          "reason": "Dragged from 𝑨𝒄𝒄𝒉𝒂 𝑵𝒆𝒕 𝑽𝑪 to 𝑪𝒉𝒊𝒍𝒍𝒊𝒏𝒈 𝑽𝑪",
+          "details": {
+            "fromChannelId": "1452648230285344940",
+            "toChannelId": "1439526437110415480"
+          },
+          "createdAt": 1775598676792
+        },
+        {
+          "id": 12,
+          "guildId": "714168295854440570",
+          "type": "mute",
+          "actorId": "1462895979052269890",
+          "targetUserId": "1039878621701079110",
+          "reason": "Manual timeout",
+          "details": {
+            "source": "manual-timeout",
+            "until": "2026-04-07T22:00:12.671Z",
+            "durationMinutes": 0
+          },
+          "createdAt": 1775599153850
+        }
+      ]
+    }
+  }
+}

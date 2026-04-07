@@ -1,6 +1,7 @@
 const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const { EmbedBuilder, userMention, PermissionsBitField } = require("discord.js");
+const { createCase } = require("../utils/caseStore");
 
 let registered = false;
 
@@ -37,6 +38,20 @@ const messageLogs = () => {
 
       if (!message.guild) return;
       if (message.author?.bot) return;
+
+      const content = (message.content || "").trim();
+      createCase({
+        guildId: message.guild.id,
+        type: "message-delete",
+        actorId: null,
+        targetUserId: message.author?.id || null,
+        reason: "Message deleted",
+        details: {
+          channelId: message.channelId,
+          messageId: message.id,
+          content: (content || "").slice(0, 300),
+        },
+      });
 
       if (!logChannelId) {
         console.warn("messageLogs: no log channel configured (MESSAGE_LOG_CHANNEL_ID or config.json.messageLogChannelId)");
@@ -105,7 +120,6 @@ const messageLogs = () => {
         )
         .setTimestamp();
 
-      const content = (message.content || "").trim();
       if (content) {
         embed.addFields({
           name: "Content",
@@ -148,6 +162,33 @@ const messageLogs = () => {
       await logChannel.send({ embeds: [embed] });
     } catch (err) {
       console.error("messageLogs error:", err);
+    }
+  });
+
+  client.on("messageUpdate", async (oldMessage, newMessage) => {
+    try {
+      if (!newMessage.guild) return;
+      if (newMessage.author?.bot) return;
+
+      const oldContent = (oldMessage?.content || "").trim();
+      const newContent = (newMessage?.content || "").trim();
+      if (!oldContent || !newContent || oldContent === newContent) return;
+
+      createCase({
+        guildId: newMessage.guild.id,
+        type: "message-edit",
+        actorId: null,
+        targetUserId: newMessage.author?.id || null,
+        reason: "Message edited",
+        details: {
+          channelId: newMessage.channelId,
+          messageId: newMessage.id,
+          before: oldContent.slice(0, 300),
+          after: newContent.slice(0, 300),
+        },
+      });
+    } catch (err) {
+      console.error("messageUpdate case-log error:", err);
     }
   });
 };

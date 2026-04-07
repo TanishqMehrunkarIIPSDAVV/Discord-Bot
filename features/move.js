@@ -2,6 +2,7 @@ const path = require("node:path");
 const { PermissionFlagsBits, ChannelType } = require("discord.js");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const channelAliases = require("../channelMap"); // make sure this path is correct
+const { createCase } = require("../utils/caseStore");
 
 const move = () => {
   client.on("messageCreate", async (message) => {
@@ -14,7 +15,8 @@ const move = () => {
     const withoutPrefix = message.content.slice(prefix.length).trim();
     const parts = withoutPrefix.split(/\s+/); // ["move","duo","vc","2","afk","vc"]
     const subcommand = parts.shift();
-    if (!subcommand || subcommand.toLowerCase() !== "move") return;
+    const action = (subcommand || "").toLowerCase();
+    if (action !== "move") return;
 
     if (parts.length < 2) {
       return message.reply(
@@ -183,6 +185,7 @@ const move = () => {
 
     try {
       let movedCount = 0;
+      const movedUserIds = [];
 
       await Promise.all(
         membersToMove.map(async (member) => {
@@ -194,6 +197,7 @@ const move = () => {
               `Moved by ${message.author.tag} from ${fromChannel.name} to ${toChannel.name}`
             );
             movedCount++;
+            movedUserIds.push(member.id);
           } catch (err) {
             console.error(`Failed to move ${member.user.tag}:`, err);
           }
@@ -204,6 +208,21 @@ const move = () => {
         return message.reply(
           "I couldn't move any members. They might already be in the target channel or I lack permissions."
         );
+      }
+
+      for (const targetUserId of movedUserIds) {
+        createCase({
+          guildId: message.guild.id,
+          type: "vc-move",
+          actorId: message.author.id,
+          targetUserId,
+          reason: `Moved from ${fromChannel.name} to ${toChannel.name}`,
+          details: {
+            fromChannelId: fromChannel.id,
+            toChannelId: toChannel.id,
+            movedCount,
+          },
+        });
       }
 
       return message.reply(

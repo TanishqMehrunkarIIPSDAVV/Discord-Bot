@@ -1,6 +1,7 @@
 const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const { userMention, PermissionFlagsBits } = require("discord.js");
+const { createCase } = require("../utils/caseStore");
 
 const kick = () => {
   client.on("messageCreate", async (message) => {
@@ -40,6 +41,14 @@ const kick = () => {
       await target.send(`You have been kicked from **${message.guild.name}**.\nReason: ${reason}`).catch(() => null);
       message.channel.send(`${userMention(target.id)} has been kicked. Reason: ${reason}`);
       await target.kick({reason});
+
+      createCase({
+        guildId: message.guild.id,
+        type: "kick",
+        actorId: message.author.id,
+        targetUserId: target.id,
+        reason,
+      });
     } catch (err) {
       console.error("Kick error:", err);
       return message.reply("Failed to kick the user. Ensure my role is above theirs and I have Kick permission.");

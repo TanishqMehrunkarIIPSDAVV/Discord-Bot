@@ -2,6 +2,7 @@ const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const { PermissionFlagsBits } = require("discord.js");
 const config = require("../config.json");
+const { createCase } = require("../utils/caseStore");
 
 const PREFIX = "ct";
 
@@ -43,6 +44,18 @@ const lockChannel = () => {
                     SendMessages: isLock ? false : null,
                 });
             }
+
+            createCase({
+                guildId: message.guild.id,
+                type: isLock ? "channel-lock" : "channel-unlock",
+                actorId: message.author.id,
+                targetUserId: message.author.id,
+                reason: isLock ? "Channel locked for configured roles" : "Channel unlocked for configured roles",
+                details: {
+                    channelId: message.channel.id,
+                    roleIds: targetRoleIds.join(", "),
+                },
+            });
 
             return message.reply(
                 isLock

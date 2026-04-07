@@ -9,6 +9,7 @@ const {
 } = require("discord.js");
 const { withDiscordNetworkRetry } = require("../utils/discordNetworkRetry");
 const { shouldSuppressVoiceLog } = require("../utils/voiceModerationState");
+const { createCase, getGuildCases } = require("../utils/caseStore");
 
 let registered = false;
 // Track last-seen member state to avoid logging stale/duplicate member updates
@@ -121,6 +122,15 @@ const auditLogs = () => {
     return `${executor.tag} (${userMention(executor.id)})`;
   };
 
+  const hasRecentCaseForTarget = (guildId, type, targetUserId, windowMs = 12000) => {
+    return getGuildCases(guildId).some((entry) => {
+      if (entry.type !== type) return false;
+      if (entry.targetUserId !== targetUserId) return false;
+      const ageMs = Date.now() - Number(entry.createdAt || 0);
+      return ageMs >= 0 && ageMs <= windowMs;
+    });
+  };
+
   const getExecutor = async (guild, opts) => {
     // opts: { types?: number|number[], targetId?: string, windowMs?: number }
     const types = Array.isArray(opts?.types) ? opts.types : (opts?.types ? [opts.types] : []);
@@ -230,6 +240,27 @@ const auditLogs = () => {
 
   client.on("guildMemberRemove", async (member) => {
     try {
+      const kickExecutor = await getExecutor(member.guild, {
+        types: AuditLogEvent.MemberKick,
+        targetId: member.id,
+        windowMs: 15000,
+      });
+      const botId = member.guild.members.me?.id || client.user?.id;
+      const recentKickExists = hasRecentCaseForTarget(member.guild.id, "kick", member.id);
+
+      if (kickExecutor?.id && kickExecutor.id !== botId && !recentKickExists) {
+        createCase({
+          guildId: member.guild.id,
+          type: "kick",
+          actorId: kickExecutor.id,
+          targetUserId: member.id,
+          reason: "Manual kick",
+          details: {
+            source: "manual-kick",
+          },
+        });
+      }
+
       if (!LOG_SETTINGS.leaves) return;
       
       const embed = new EmbedBuilder()
@@ -250,6 +281,7 @@ const auditLogs = () => {
   // Member updates: nick/roles/timeouts
   client.on("guildMemberUpdate", async (oldMember, newMember) => {
     try {
+      let skipNonTimeoutLogs = false;
       // Ignore updates for recently joined members (auto-role assignments)
       const joinTime = recentJoins.get(newMember.id);
       if (joinTime && Date.now() - joinTime < 10000) {
@@ -265,9 +297,8 @@ const auditLogs = () => {
         const onlyEveryone = oldRolesSize === 1 && oldRoles.has(newMember.guild.id);
         const isPartialRoles = oldMember?.partial || !oldRoles || onlyEveryone;
         if (isPartialRoles) {
-          // Avoid false-positive "all roles added" logs from partial data
-          snapshotMemberState(newMember);
-          return;
+          // Avoid false-positive role/nickname diffs from partial data, but still process timeout changes.
+          skipNonTimeoutLogs = true;
         }
       }
       
@@ -279,7 +310,7 @@ const auditLogs = () => {
 
       const changes = [];
 
-      if (LOG_SETTINGS.nickname && prev.nickname !== newMember.nickname) {
+      if (!skipNonTimeoutLogs && LOG_SETTINGS.nickname && prev.nickname !== newMember.nickname) {
         changes.push({
           name: "Nickname",
           value: `${prev.nickname || "None"} → ${newMember.nickname || "None"}`,
@@ -287,12 +318,18 @@ const auditLogs = () => {
       }
 
       // Check for timeout changes
-      const prevTimeout = prev.communicationDisabledUntil;
-      const currTimeout = newMember.communicationDisabledUntil;
-      
-      // Normalize dates for comparison (handle both Date objects and null)
-      const prevTimeMs = prevTimeout instanceof Date ? prevTimeout.getTime() : null;
-      const currTimeMs = currTimeout instanceof Date ? currTimeout.getTime() : null;
+      const prevTimeMs =
+        typeof oldMember?.communicationDisabledUntilTimestamp === "number"
+          ? oldMember.communicationDisabledUntilTimestamp
+          : prev.communicationDisabledUntil instanceof Date
+            ? prev.communicationDisabledUntil.getTime()
+            : null;
+      const currTimeMs =
+        typeof newMember?.communicationDisabledUntilTimestamp === "number"
+          ? newMember.communicationDisabledUntilTimestamp
+          : newMember.communicationDisabledUntil instanceof Date
+            ? newMember.communicationDisabledUntil.getTime()
+            : null;
       
       // Only log if there's an actual change in timeout value
       const timeoutChanged = prevTimeMs !== currTimeMs;
@@ -322,19 +359,69 @@ const auditLogs = () => {
         // Clean up after 6 seconds
         setTimeout(() => recentTimeouts.delete(timeoutKey), 6000);
         
-        const timeoutExecutor = await getExecutor(newMember.guild, { types: AuditLogEvent.MemberUpdate, targetId: newMember.id, windowMs: 5000 });
+        let timeoutExecutor = await getExecutor(newMember.guild, {
+          types: AuditLogEvent.MemberUpdate,
+          targetId: newMember.id,
+          windowMs: 6000,
+        });
+
+        if (!timeoutExecutor) {
+          timeoutExecutor = await getExecutor(newMember.guild, {
+            types: AuditLogEvent.MemberUpdate,
+            targetId: newMember.id,
+            windowMs: 20000,
+          });
+        }
         
         if (timeoutAdded) {
-          const durationMs = currTimeout.getTime() - Date.now();
+          const durationMs = currTimeMs - Date.now();
           const durationSec = Math.max(0, Math.floor(durationMs / 1000));
           const durationMin = Math.floor(durationSec / 60);
+
+          const botId = newMember.guild.members.me?.id || client.user?.id;
+          const recentMuteExists = getGuildCases(newMember.guild.id).some((entry) => {
+            if (entry.type !== "mute") return false;
+            if (entry.targetUserId !== newMember.id) return false;
+            const ageMs = Date.now() - Number(entry.createdAt || 0);
+            return ageMs >= 0 && ageMs <= 12000;
+          });
+
+          if (timeoutExecutor?.id && timeoutExecutor.id !== botId) {
+            createCase({
+              guildId: newMember.guild.id,
+              type: "mute",
+              actorId: timeoutExecutor.id,
+              targetUserId: newMember.id,
+              reason: "Manual timeout",
+              details: {
+                source: "manual-timeout",
+                until: new Date(currTimeMs).toISOString(),
+                durationMinutes: durationMin,
+              },
+            });
+          } else if (!timeoutExecutor?.id && !recentMuteExists) {
+            createCase({
+              guildId: newMember.guild.id,
+              type: "mute",
+              actorId: null,
+              targetUserId: newMember.id,
+              reason: "Manual timeout",
+              details: {
+                source: "manual-timeout",
+                until: new Date(currTimeMs).toISOString(),
+                durationMinutes: durationMin,
+                actorUnknown: true,
+              },
+            });
+          }
+
           const embed = new EmbedBuilder()
             .setColor("#F97316")
             .setTitle("⏱️ Member Timed Out")
             .addFields(
               { name: "User", value: `${newMember.user.tag} (${userMention(newMember.id)})` },
               { name: "Duration", value: durationMin > 0 ? `${durationMin} minute${durationMin !== 1 ? 's' : ''}` : "Less than 1 minute", inline: true },
-              { name: "Until", value: `<t:${Math.floor(currTimeout.getTime() / 1000)}:F>`, inline: true },
+              { name: "Until", value: `<t:${Math.floor(currTimeMs / 1000)}:F>`, inline: true },
               { name: "Timed Out By", value: formatExecutor(newMember.guild, timeoutExecutor) }
             );
           await sendLog(newMember.guild, embed, "member");
@@ -355,8 +442,8 @@ const auditLogs = () => {
 
       const prevRoles = prev.roles;
       const currRoles = new Set(newMember.roles.cache.keys());
-      const added = [...currRoles].filter((r) => !prevRoles.has(r) && r !== EXCLUDED_ROLE_ID);
-      const removed = [...prevRoles].filter((r) => !currRoles.has(r) && r !== EXCLUDED_ROLE_ID);
+      const added = skipNonTimeoutLogs ? [] : [...currRoles].filter((r) => !prevRoles.has(r) && r !== EXCLUDED_ROLE_ID);
+      const removed = skipNonTimeoutLogs ? [] : [...prevRoles].filter((r) => !currRoles.has(r) && r !== EXCLUDED_ROLE_ID);
 
       if (LOG_SETTINGS.roles && added.length) {
         changes.push({ name: "Roles Added", value: added.map((id) => `<@&${id}>`).join(" ") });
@@ -403,6 +490,34 @@ const auditLogs = () => {
   client.on("guildBanAdd", async (ban) => {
     try {
       const executor = await getExecutor(ban.guild, { types: AuditLogEvent.MemberBanAdd, targetId: ban.user.id });
+      const botId = ban.guild.members.me?.id || client.user?.id;
+      const recentBanExists = hasRecentCaseForTarget(ban.guild.id, "ban", ban.user.id);
+
+      if (executor?.id && executor.id !== botId && !recentBanExists) {
+        createCase({
+          guildId: ban.guild.id,
+          type: "ban",
+          actorId: executor.id,
+          targetUserId: ban.user.id,
+          reason: ban.reason || "Manual ban",
+          details: {
+            source: "manual-ban",
+          },
+        });
+      } else if (!executor?.id && !recentBanExists) {
+        createCase({
+          guildId: ban.guild.id,
+          type: "ban",
+          actorId: null,
+          targetUserId: ban.user.id,
+          reason: ban.reason || "Manual ban",
+          details: {
+            source: "manual-ban",
+            actorUnknown: true,
+          },
+        });
+      }
+
       const embed = new EmbedBuilder()
         .setColor("#EF4444")
         .setTitle("🔨 User Banned")
