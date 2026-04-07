@@ -61,6 +61,12 @@ const warn = () => {
       return message.reply("You cannot warn yourself.");
     }
 
+    if (target.roles.highest.position >= message.member.roles.highest.position) {
+      return message.reply(
+        `You cannot warn this user because their role is higher than or equal to your highest role.`
+      );
+    }
+
     try {
       const cfg = loadConfig();
       const guildWarns = ensureWarnStore(cfg, message.guild.id);
