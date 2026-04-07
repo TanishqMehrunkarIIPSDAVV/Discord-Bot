@@ -87,6 +87,12 @@ const getHelpPages = () => {
         .setTitle("🤖 Help • Prefix Commands (2/3)")
         .setThumbnail("attachment://thumbnail.jpg")
         .setDescription(
+            `👤 **Information**\n` +
+            `• \`ct userinfo [user]\` Show detailed user info\n` +
+            `• \`ct roleinfo <role>\` Show detailed role info\n\n` +
+            `🟣 **AFK**\n` +
+            `• \`ct afk [reason]\` Mark yourself AFK\n` +
+            `• \`ct afk off\` Remove your AFK status\n\n` +
             `🛡️ **Moderation**\n` +
             `• \`ct kick <user> [reason]\` Kick member\n` +
             `• \`ct ban <user> [reason]\` Ban member\n` +
