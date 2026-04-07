@@ -27,5 +27,10 @@
   "chatRevivalRoleId": "1441084599882088488",
   "vcRevivalRoleId": "1441084639295967444",
   "privateVcDefaultLimit": 5,
-  "privateVcAutoDelete": true
+  "privateVcAutoDelete": true,
+  "lockRoleIds": [
+    "714168295854440570",
+    "1451430195327271086",
+    "1439540626872995933"
+  ]
 }

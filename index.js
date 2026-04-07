@@ -120,6 +120,8 @@ const vcUpdate=require("./features/vcUpdate");
 vcUpdate();
 const help=require("./features/help");
 help();
+const lockChannel = require("./features/lockChannel");
+lockChannel();
 // const tts=require("./features/tts");
 // tts();
 const welcome=require("./features/welcome");
