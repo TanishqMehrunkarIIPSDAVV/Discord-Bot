@@ -79,7 +79,9 @@ const getHelpPages = () => {
             `• </test:> Testing command\n\n` +
             `🔊 **Voice & Moderation**\n` +
             `• </removeme:> Schedule VC removal\n` +
-            `• </vcguard:> Enable/disable VC guard\n`
+            `• </vcguard:> Enable/disable VC guard\n` +
+            `• </vcpoints:> Show VC points for you or a user\n` +
+            `• </vcleaderboard:> Show VC points leaderboard\n`
         )
         .setFooter({ text: "Use the ⏭️ Next and ⏮️ Previous buttons to navigate pages!" }),
         new EmbedBuilder()
@@ -114,7 +116,9 @@ const getHelpPages = () => {
             `• \`ct announce <text>\` Post announcement in current channel\n` +
             `• \`ct postboymod [text]\` Post boy-mod application panel\n` +
             `• \`ct postgirlmod [text]\` Post girl-mod application panel\n` +
-            `• \`ct vc\` Mention users in your VC\n`
+            `• \`ct vc\` Mention users in your VC\n` +
+            `• \`ct vcpoints [user]\` Show VC points for you or a user\n` +
+            `• \`ct vcleaderboard [limit]\` Show VC points leaderboard\n`
         )
         .setFooter({ text: "Use the ⏮️ Previous and ⏭️ Next buttons to navigate pages!" }),
         new EmbedBuilder()

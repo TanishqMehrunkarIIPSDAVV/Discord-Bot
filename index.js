@@ -118,6 +118,8 @@ member();
 // speech();
 const vcUpdate=require("./features/vcUpdate");
 vcUpdate();
+const vcPoints = require("./features/vcPoints");
+vcPoints();
 const help=require("./features/help");
 help();
 const info = require("./features/info");
