@@ -5,14 +5,65 @@ const config = require("../config.json");
 const { Events } = require("discord.js");
 const { withDiscordNetworkRetry } = require("../utils/discordNetworkRetry");
 
-const API_URL = process.env.AI_API_URL || "https://openrouter.ai/api/v1/chat/completions";
-const AI_MODEL = process.env.AI_MODEL || "openai/gpt-4o-mini";
-const AI_API_KEY = (
-    process.env.OPENROUTER_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    process.env.AI_API_KEY ||
-    ""
-).trim();
+const OPENROUTER_API_KEY = (process.env.OPENROUTER_API_KEY || "").trim();
+const OPENAI_API_KEY = (process.env.OPENAI_API_KEY || "").trim();
+const GENERIC_AI_API_KEY = (process.env.AI_API_KEY || "").trim();
+const AI_API_URL = (process.env.AI_API_URL || "").trim();
+const AI_PROVIDER = (process.env.AI_PROVIDER || "").trim().toLowerCase();
+const USER_DEFINED_MODEL = (process.env.AI_MODEL || "").trim();
+
+function detectProviderFromUrl(url) {
+    if (!url) return null;
+    const lower = url.toLowerCase();
+    if (lower.includes("openrouter.ai")) return "openrouter";
+    if (lower.includes("api.openai.com")) return "openai";
+    return null;
+}
+
+function detectProviderFromApiKey(apiKey) {
+    if (!apiKey) return null;
+    const key = apiKey.trim().toLowerCase();
+
+    // OpenRouter keys usually start with sk-or-v1.
+    if (key.startsWith("sk-or-v1")) return "openrouter";
+
+    // OpenAI keys usually start with sk- (including newer project-scoped keys).
+    if (key.startsWith("sk-")) return "openai";
+
+    return null;
+}
+
+function resolveAiRuntimeConfig() {
+    const providerFromUrl = detectProviderFromUrl(AI_API_URL);
+    const keyProviderHints = [
+        detectProviderFromApiKey(OPENROUTER_API_KEY),
+        detectProviderFromApiKey(OPENAI_API_KEY),
+        detectProviderFromApiKey(GENERIC_AI_API_KEY),
+    ].filter(Boolean);
+    const providerFromKey = keyProviderHints[0] || null;
+    const provider = AI_PROVIDER || providerFromUrl || providerFromKey;
+
+    const preferOpenRouter =
+        provider === "openrouter" || (!provider && OPENROUTER_API_KEY);
+
+    if (preferOpenRouter) {
+        return {
+            provider: "openrouter",
+            apiUrl: AI_API_URL || "https://openrouter.ai/api/v1/chat/completions",
+            apiKey: OPENROUTER_API_KEY || GENERIC_AI_API_KEY || OPENAI_API_KEY,
+            model: USER_DEFINED_MODEL || "openai/gpt-4o-mini",
+        };
+    }
+
+    return {
+        provider: "openai",
+        apiUrl: AI_API_URL || "https://api.openai.com/v1/chat/completions",
+        apiKey: OPENAI_API_KEY || GENERIC_AI_API_KEY || OPENROUTER_API_KEY,
+        model: USER_DEFINED_MODEL || "gpt-4o-mini",
+    };
+}
+
+const RUNTIME_AI_CONFIG = resolveAiRuntimeConfig();
 
 const SYSTEM_PROMPT =
     "You are a helpful Discord server assistant. Reply in a friendly, concise way. " +
@@ -189,7 +240,7 @@ async function generateAiResponse({ prompt, authorTag, guildName, history = [] }
         `Message: ${prompt}`;
 
     const payload = {
-        model: AI_MODEL,
+        model: RUNTIME_AI_CONFIG.model,
         messages: [
             { role: "system", content: SYSTEM_PROMPT },
             ...history,
@@ -200,11 +251,11 @@ async function generateAiResponse({ prompt, authorTag, guildName, history = [] }
 
     const response = await withDiscordNetworkRetry(
         async () => {
-            return fetch(API_URL, {
+            return fetch(RUNTIME_AI_CONFIG.apiUrl, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${AI_API_KEY}`,
+                    Authorization: `Bearer ${RUNTIME_AI_CONFIG.apiKey}`,
                 },
                 body: JSON.stringify(payload),
             });
@@ -218,6 +269,16 @@ async function generateAiResponse({ prompt, authorTag, guildName, history = [] }
 
     if (!response.ok) {
         const bodyText = await response.text().catch(() => "");
+        const shortBody = bodyText.slice(0, 300);
+
+        if (response.status === 401) {
+            throw new Error(
+                `AI auth failed (401) for ${RUNTIME_AI_CONFIG.provider}. ` +
+                    "Check that AI_API_URL matches your API key provider and that the key is valid. " +
+                    `Response: ${shortBody}`
+            );
+        }
+
         throw new Error(`AI request failed (${response.status}): ${bodyText.slice(0, 300)}`);
     }
 
@@ -250,9 +311,9 @@ const aiReply = () => {
             `User: ${message.author.tag}\n` +
             `Message: ${prompt}`;
 
-        if (!AI_API_KEY) {
+        if (!RUNTIME_AI_CONFIG.apiKey) {
             await message.reply(
-                "AI replies are not configured yet. Add OPENROUTER_API_KEY (or OPENAI_API_KEY) in environment variables."
+                "AI replies are not configured yet. Add OPENROUTER_API_KEY or OPENAI_API_KEY (or set AI_API_KEY + AI_API_URL)."
             );
             return;
         }
