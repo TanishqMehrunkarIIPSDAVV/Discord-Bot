@@ -4,6 +4,19 @@ const path = require("node:path");
 const POINTS_PER_MINUTE = 0.1; // 10 minutes = 1 point
 const DATA_PATH = path.join(__dirname, "..", "data", "vc-points.json");
 
+const MILESTONES = [
+  { points: 50, name: "🎧 ✦ 𝐕𝐂 𝐍𝐄𝐖𝐁𝐈𝐄 ✦ 🎧", roleId: "1491883856083550228" },
+  { points: 100, name: "💬 ✦ 𝐕𝐂 𝐋𝐈𝐒𝐓𝐄𝐍𝐄𝐑 ✦ 💬", roleId: "1491884162905280662" },
+  { points: 200, name: "🎙️ ✦ 𝐕𝐂 𝐑𝐄𝐆𝐔𝐋𝐀𝐑 ✦ 🎙️", roleId: "1491884351711875082" },
+  { points: 400, name: "🔥 ✦ 𝐀𝐃𝐃𝐀 𝐀𝐂𝐓𝐈𝐕𝐄 ✦ 🔥", roleId: "1491884436399194373" },
+  { points: 1000, name: "⚡ ✦ 𝐕𝐂 𝐏𝐑𝐎 ✦ ⚡", roleId: "1491884535955198012" },
+  { points: 2000, name: "💫 ✦ 𝐓𝐀𝐏𝐑𝐈 𝐕𝐈𝐁𝐄𝐑 ✦ 💫", roleId: "1491884706667696188" },
+  { points: 4000, name: "👑 ✦ 𝐀𝐃𝐃𝐀 𝐒𝐓𝐀𝐑 ✦ 👑", roleId: "1491884784677290168" },
+  { points: 8500, name: "💎 ✦ 𝐕𝐂 𝐄𝐋𝐈𝐓𝐄 ✦ 💎", roleId: "1491884879808299088" },
+  { points: 10000, name: "🌟 ✦ 𝐓𝐀𝐏𝐑𝐈 𝐋𝐄𝐆𝐄𝐍𝐃 ✦ 🌟", roleId: "1491885038189674567" },
+  { points: 35000, name: "🚀 ✦ 𝐀𝐃𝐃𝐀 𝐈𝐂𝐎𝐍 ✦ 🚀", roleId: "1491885111652646933" },
+];
+
 let cache = null;
 
 const createDefaultStore = () => ({
@@ -48,7 +61,14 @@ const getPendingMinutes = (guildId, userId, nowMs = Date.now()) => {
   if (!session) return 0;
 
   const start = Number(session.startedAt) || nowMs;
-  const elapsedMs = Math.max(0, nowMs - start);
+  let endTime = nowMs;
+
+  // If paused, use pausedAt instead of current time
+  if (session.pausedAt) {
+    endTime = Number(session.pausedAt);
+  }
+
+  const elapsedMs = Math.max(0, endTime - start);
   return elapsedMs / 60000;
 };
 
@@ -107,7 +127,14 @@ const stopSession = (guildId, userId, endedAtMs = Date.now()) => {
 
   const end = Number(endedAtMs) || Date.now();
   const start = Number(session.startedAt) || end;
-  const elapsedMs = Math.max(0, end - start);
+  
+  // If paused, calculate from pause time, otherwise from now
+  let effectiveEnd = end;
+  if (session.pausedAt) {
+    effectiveEnd = Number(session.pausedAt);
+  }
+
+  const elapsedMs = Math.max(0, effectiveEnd - start);
   const elapsedMinutes = elapsedMs / 60000;
 
   const pointsDelta = awardMinutes(guildId, userId, elapsedMinutes);
@@ -123,6 +150,55 @@ const dropSession = (guildId, userId) => {
   delete data.activeSessions[key];
   saveStore();
   return true;
+};
+
+const pauseSession = (guildId, userId, pausedAtMs = Date.now()) => {
+  const data = loadStore();
+  const key = sessionKey(guildId, userId);
+  const session = data.activeSessions[key];
+  if (!session || session.pausedAt) return false; // Already paused or not in session
+
+  session.pausedAt = Number(pausedAtMs) || Date.now();
+  saveStore();
+  return true;
+};
+
+const resumeSession = (guildId, userId, resumedAtMs = Date.now()) => {
+  const data = loadStore();
+  const key = sessionKey(guildId, userId);
+  const session = data.activeSessions[key];
+  if (!session || !session.pausedAt) return false; // Not paused or not in session
+
+  const pausedMs = Number(session.pausedAt);
+  const resumeMs = Number(resumedAtMs) || Date.now();
+  const pausedDuration = resumeMs - pausedMs;
+
+  // Shift session start time forward by pause duration
+  session.startedAt = Number(session.startedAt) + pausedDuration;
+  session.pausedAt = null;
+  saveStore();
+  return true;
+};
+
+const getCurrentMilestone = (points) => {
+  let current = null;
+  for (const milestone of MILESTONES) {
+    if (points >= milestone.points) {
+      current = milestone;
+    } else {
+      break;
+    }
+  }
+  return current;
+};
+
+const getNextMilestone = (points) => {
+  for (const milestone of MILESTONES) {
+    if (points < milestone.points) {
+      return milestone;
+    }
+  }
+  return null;
 };
 
 const getUserStats = (guildId, userId) => {
@@ -180,12 +256,17 @@ const listActiveSessions = () => {
 
 module.exports = {
   POINTS_PER_MINUTE,
+  MILESTONES,
   loadStore,
   saveStore,
   startSession,
   stopSession,
   dropSession,
+  pauseSession,
+  resumeSession,
   getUserStats,
   getLeaderboard,
   listActiveSessions,
+  getCurrentMilestone,
+  getNextMilestone,
 };

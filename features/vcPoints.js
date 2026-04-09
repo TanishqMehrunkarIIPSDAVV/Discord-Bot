@@ -5,12 +5,24 @@ const {
   startSession,
   stopSession,
   dropSession,
+  pauseSession,
+  resumeSession,
+  loadStore,
+  saveStore,
   getUserStats,
   getLeaderboard,
   listActiveSessions,
+  getCurrentMilestone,
+  getNextMilestone,
+  MILESTONES,
 } = require("../utils/vcPointsStore");
 
 const PREFIX = "ct";
+const MILESTONE_ANNOUNCE_CHANNEL_ID = "1439523872331534366";
+const LIVE_MILESTONE_SYNC_INTERVAL_MS = 30000;
+
+let liveMilestoneTicker = null;
+let isLiveMilestoneSyncRunning = false;
 
 const formatPoints = (value) => Number(value || 0).toFixed(2);
 const formatHours = (value) => Number(value || 0).toFixed(2);
@@ -33,10 +45,24 @@ const resolveUserIdFromArg = async (message, rawArg) => {
 
 const sendUserPoints = async (message, targetUserId) => {
   const stats = getUserStats(message.guild.id, targetUserId);
+  const currentMilestone = getCurrentMilestone(stats.points);
+  const nextMilestone = getNextMilestone(stats.points);
+  
+  let milestoneText = "";
+  if (currentMilestone) {
+    milestoneText = `\n🏅 **${currentMilestone.name}**`;
+  }
+  
+  let progressText = "";
+  if (nextMilestone) {
+    const pointsNeeded = nextMilestone.points - stats.points;
+    progressText = `\n🎯 Next: **${nextMilestone.name}** (${pointsNeeded.toFixed(2)} points away)`;
+  }
+  
   return message.channel.send(
     `${userMention(targetUserId)} has **${formatPoints(stats.points)}** VC points (tracked time: **${formatHours(
       stats.trackedHours
-    )} hours**).`
+    )} hours**)${milestoneText}${progressText}`
   );
 };
 
@@ -53,9 +79,11 @@ const sendLeaderboard = async (message, limitArg) => {
 
   const lines = rows.map((entry, index) => {
     const rank = index + 1;
+    const milestone = getCurrentMilestone(entry.points);
+    const roleLabel = milestone ? milestone.name : "No milestone yet";
     return `${rank}. ${userMention(entry.userId)} - **${formatPoints(entry.points)}** points (**${formatHours(
       entry.trackedMinutes / 60
-    )}h**)`;
+    )}h**) | **Role:** ${roleLabel}`;
   });
 
   const embed = new EmbedBuilder()
@@ -64,6 +92,85 @@ const sendLeaderboard = async (message, limitArg) => {
     .setDescription(lines.join("\n"));
 
   return message.channel.send({ embeds: [embed] });
+};
+
+const getMilestoneRoleIds = () => MILESTONES.map((milestone) => milestone.roleId);
+
+const announceMilestone = async (guild, userId, milestone, points) => {
+  const channel = await guild.channels.fetch(MILESTONE_ANNOUNCE_CHANNEL_ID).catch(() => null);
+  if (!channel || !channel.isTextBased()) return;
+
+  await channel.send(
+    `🎉 ${userMention(userId)} has reached **${milestone.name}** at **${formatPoints(points)}** VC points!`
+  );
+};
+
+const syncMilestoneRoleForUser = async (guild, userId, options = {}) => {
+  const { announce = false, markAnnounced = false } = options;
+  const member = await guild.members.fetch(userId).catch(() => null);
+  if (!member || member.user.bot) return;
+
+  const stats = getUserStats(guild.id, userId);
+  const currentMilestone = getCurrentMilestone(stats.points);
+  const roleIds = getMilestoneRoleIds();
+  const targetRoleId = currentMilestone?.roleId || null;
+
+  const rolesToRemove = roleIds.filter((roleId) => member.roles.cache.has(roleId) && roleId !== targetRoleId);
+  if (rolesToRemove.length) {
+    await member.roles.remove(rolesToRemove).catch(() => null);
+  }
+
+  if (targetRoleId && !member.roles.cache.has(targetRoleId)) {
+    await member.roles.add(targetRoleId).catch(() => null);
+  }
+
+  const store = loadStore();
+  const entry = store.guilds?.[guild.id]?.users?.[userId];
+  if (!entry) return;
+
+  const lastAnnouncedMilestonePoints = Number(entry.lastAnnouncedMilestonePoints || 0);
+
+  if (announce && currentMilestone) {
+    if (currentMilestone.points > lastAnnouncedMilestonePoints) {
+      await announceMilestone(guild, userId, currentMilestone, stats.points);
+      entry.lastAnnouncedMilestonePoints = currentMilestone.points;
+      saveStore();
+    }
+  }
+
+  if (markAnnounced) {
+    const targetAnnouncedPoints = currentMilestone?.points || 0;
+    if (lastAnnouncedMilestonePoints !== targetAnnouncedPoints) {
+      entry.lastAnnouncedMilestonePoints = targetAnnouncedPoints;
+      saveStore();
+    }
+  }
+};
+
+const syncAllMilestonesForGuild = async (guild) => {
+  const store = loadStore();
+  const users = store.guilds?.[guild.id]?.users || {};
+  const userIds = Object.keys(users);
+
+  for (const userId of userIds) {
+    await syncMilestoneRoleForUser(guild, userId, { markAnnounced: true });
+  }
+};
+
+const syncMilestonesForActiveSessions = async () => {
+  if (isLiveMilestoneSyncRunning) return;
+  isLiveMilestoneSyncRunning = true;
+
+  try {
+    const activeSessions = listActiveSessions();
+    for (const session of activeSessions) {
+      const guild = client.guilds.cache.get(session.guildId);
+      if (!guild) continue;
+      await syncMilestoneRoleForUser(guild, session.userId, { announce: true });
+    }
+  } finally {
+    isLiveMilestoneSyncRunning = false;
+  }
 };
 
 const handlePrefixCommands = async (message) => {
@@ -105,6 +212,11 @@ const reconcileSessionsOnReady = async () => {
       const key = `${guild.id}:${userId}`;
       liveSessions.add(key);
       startSession(guild.id, userId);
+
+      const isInactive = state.mute || state.selfMute || state.deaf || state.selfDeaf;
+      if (isInactive) {
+        pauseSession(guild.id, userId);
+      }
     }
   }
 
@@ -129,13 +241,47 @@ const vcPoints = () => {
     const wasInVoice = Boolean(oldState.channelId);
     const isInVoice = Boolean(newState.channelId);
 
+    // Handle joining voice channel
     if (!wasInVoice && isInVoice) {
       startSession(guildId, userId);
+
+      const isInactive = newState.mute || newState.selfMute || newState.deaf || newState.selfDeaf;
+      if (isInactive) {
+        pauseSession(guildId, userId);
+      }
       return;
     }
 
+    // Handle leaving voice channel
     if (wasInVoice && !isInVoice) {
+      const guild = newState.guild || oldState.guild;
       stopSession(guildId, userId);
+      if (guild) {
+        await syncMilestoneRoleForUser(guild, userId, { announce: true });
+      }
+      return;
+    }
+
+    // Handle mute/deafen state changes while in voice
+    if (isInVoice) {
+      const wasMuted = oldState.mute || oldState.selfMute;
+      const isMuted = newState.mute || newState.selfMute;
+      
+      const wasDeafened = oldState.deaf || oldState.selfDeaf;
+      const isDeafened = newState.deaf || newState.selfDeaf;
+
+      const wasInactive = wasMuted || wasDeafened;
+      const isInactive = isMuted || isDeafened;
+
+      // Transitioned from active to inactive (muted/deafened)
+      if (!wasInactive && isInactive) {
+        pauseSession(guildId, userId);
+      }
+
+      // Transitioned from inactive to active (unmuted/undeafened)
+      if (wasInactive && !isInactive) {
+        resumeSession(guildId, userId);
+      }
     }
   });
 
@@ -144,6 +290,20 @@ const vcPoints = () => {
   client.once("clientReady", async () => {
     // Rebuild in-memory sessions from current voice states when the bot comes online.
     await reconcileSessionsOnReady();
+
+    // Backfill milestone roles from persisted VC points.
+    for (const guild of client.guilds.cache.values()) {
+      await syncAllMilestonesForGuild(guild);
+    }
+
+    // Process live session milestones periodically so users can rank up without leaving VC.
+    await syncMilestonesForActiveSessions();
+    if (liveMilestoneTicker) {
+      clearInterval(liveMilestoneTicker);
+    }
+    liveMilestoneTicker = setInterval(() => {
+      void syncMilestonesForActiveSessions();
+    }, LIVE_MILESTONE_SYNC_INTERVAL_MS);
   });
 };
 

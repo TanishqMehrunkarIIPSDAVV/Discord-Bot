@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, EmbedBuilder, userMention } = require("discord.js");
-const { getLeaderboard } = require("../utils/vcPointsStore");
+const { getLeaderboard, getCurrentMilestone } = require("../utils/vcPointsStore");
 
 const formatPoints = (value) => Number(value || 0).toFixed(2);
 const formatHours = (value) => Number(value || 0).toFixed(2);
@@ -30,9 +30,11 @@ module.exports = {
     const description = rows
       .map((row, index) => {
         const rank = index + 1;
+        const milestone = getCurrentMilestone(row.points);
+        const roleLabel = milestone ? milestone.name : "No milestone yet";
         return `${rank}. ${userMention(row.userId)} - **${formatPoints(row.points)}** points (**${formatHours(
           row.trackedMinutes / 60
-        )}h**)`;
+        )}h**) | **Role:** ${roleLabel}`;
       })
       .join("\n");
 
