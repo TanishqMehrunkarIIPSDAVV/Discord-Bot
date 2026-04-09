@@ -70,6 +70,9 @@ const getHelpPages = () => {
             `• </user:> Show user info\n` +
             `• </server:> Show server info\n` +
             `• </prune:> Delete 1-99 messages\n\n` +
+            `🎨 **Gradient Roles**\n` +
+            `• </gradientrole:> Create or reuse your gradient role from two hex colors\n` +
+            `• Same gradient input reuses the existing role instead of making a duplicate\n\n` +
             `🎭 **Fun / Utility**\n` +
             `• </die:> Cringe reaction GIF\n` +
             `• </options-info:> Echo input\n` +
@@ -139,6 +142,10 @@ const getHelpPages = () => {
             `• Channel logs: ${channelLogChannel}\n` +
             `• Voice logs: ${voiceLogChannel}\n` +
             `• Mod logs: ${modLogChannel}\n\n` +
+            `🎨 **Gradient Roles**\n` +
+            `• Custom gradient roles are created from the two hex colors you provide\n` +
+            `• Existing matching gradients are reused, not duplicated\n` +
+            `• Role order is managed by the bot and kept at the configured hierarchy position\n\n` +
             `🔊 **Other Active Systems**\n` +
             `• Private VC trigger: ${privateVcTriggerChannel}\n` +
             `• AI reply channels: ${aiReplyChannels}\n` +
