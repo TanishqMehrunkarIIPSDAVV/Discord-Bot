@@ -14,6 +14,8 @@
   "complaintButtonChannelId": "1462800937507618922",
   "complaintDisplayChannelId": "1473331541584379974",
   "complaintAdminChannelId": "1473331580972961905",
+  "suggestionButtonChannelId": "1491921404298395748",
+  "suggestionPostChannelId": "1491921828359180380",
   "confessionAdminChannelId": "1473348273111568455",
   "privateVcTriggerChannelId": "1473620278759133194",
   "vcAutoDisconnectEnabled": true,
