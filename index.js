@@ -170,6 +170,8 @@ const boyModApplication = require("./features/boyModApplication");
 boyModApplication();
 const aiReply = require("./features/aiReply");
 aiReply();
+const chatLore = require("./features/chatLore");
+chatLore();
 const announcement = require("./features/announcement");
 announcement();
 const revivalMentions = require("./features/revivalMentions");

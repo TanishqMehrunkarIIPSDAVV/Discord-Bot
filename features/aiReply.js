@@ -71,6 +71,8 @@ const SYSTEM_PROMPT =
 
 const MAX_HISTORY_TURNS = Number(process.env.AI_HISTORY_TURNS || 8);
 const MAX_TRACKED_USERS = Number(process.env.AI_MAX_TRACKED_USERS || 500);
+// Special user ID that can use AI mentions in any channel (set via SPECIAL_AI_USER_ID env var)
+const SPECIAL_AI_USER_ID = (process.env.SPECIAL_AI_USER_ID || "").trim();
 const ALLOWED_AI_CHANNEL_IDS = new Set([
     ...(process.env.AI_ALLOWED_CHANNEL_IDS || "")
         .split(",")
@@ -118,6 +120,11 @@ function splitMessage(text, limit = 1900) {
 }
 
 function isAllowedAiChannel(message) {
+    // Special user can use AI in any channel
+    if (SPECIAL_AI_USER_ID && message.author.id === SPECIAL_AI_USER_ID) {
+        return true;
+    }
+
     if (ALLOWED_AI_CHANNEL_IDS.size === 0) {
         return true;
     }
