@@ -84,6 +84,7 @@ const getHelpPages = () => {
             `🔊 **Voice & Moderation**\n` +
             `• </removeme:> Schedule VC removal\n` +
             `• </vcguard:> Enable/disable VC guard\n` +
+            `• </quest:> Show quest board, stats, history, leaderboard, or trash active quest\n` +
             `• </vcpoints:> Show VC points for you or a user\n` +
             `• </vcleaderboard:> Show VC points leaderboard\n`
         )
@@ -121,6 +122,7 @@ const getHelpPages = () => {
             `• \`ct postboymod [text]\` Post boy-mod application panel\n` +
             `• \`ct postgirlmod [text]\` Post girl-mod application panel\n` +
             `• \`ct vc\` Mention users in your VC\n` +
+            `• \`ct quest [board|stats|history|leaderboard|trash]\` Show quest views or trash active quest\n` +
             `• \`ct vcpoints [user]\` Show VC points for you or a user\n` +
             `• \`ct vcleaderboard [limit]\` Show VC points leaderboard\n`
         )

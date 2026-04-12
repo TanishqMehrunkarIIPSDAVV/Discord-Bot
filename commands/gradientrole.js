@@ -4,7 +4,7 @@ const {
   saveUserGradientRole,
 } = require('../utils/gradientRoleStore');
 
-const ROLE_POSITION = 50;
+const ROLE_POSITION = 60;
 
 const buildGradientRoleName = (startColor, endColor) => `GRAD-${startColor}-${endColor}`;
 

@@ -178,6 +178,8 @@ const revivalMentions = require("./features/revivalMentions");
 revivalMentions();
 const suggestions = require("./features/suggestions");
 suggestions();
+const quest = require("./features/quest");
+quest();
 client.login(token).catch((err) => {
     console.error("Failed to login Discord client:", err?.message || err);
     process.exit(1);
