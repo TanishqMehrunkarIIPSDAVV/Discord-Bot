@@ -11,6 +11,7 @@ const QUEST_LEVEL_XP_STEP = 100;
 const QUEST_HISTORY_LIMIT = 20;
 const ECHO_CHAT_COOLDOWN_MS = 8_000;
 const QUEST_TRASH_COOLDOWN_MS = 3 * 60 * 1000;
+const USER_QUEST_CHOICES_COUNT = 4;
 
 const CHAT_QUEST_TEMPLATES = [
   {
@@ -258,6 +259,8 @@ const VOICE_QUEST_TEMPLATES = [
   },
 ];
 
+const ALL_QUEST_TEMPLATES = [...CHAT_QUEST_TEMPLATES, ...VOICE_QUEST_TEMPLATES];
+
 let cache = null;
 
 const createDefaultStore = () => ({
@@ -294,7 +297,6 @@ const ensureGuildState = (guildId) => {
 
   if (!data.guilds[guildId] || typeof data.guilds[guildId] !== "object") {
     data.guilds[guildId] = {
-      activeQuests: [],
       refreshAt: 0,
       cycleStartedAt: 0,
       users: {},
@@ -302,7 +304,6 @@ const ensureGuildState = (guildId) => {
   }
 
   const guildState = data.guilds[guildId];
-  if (!Array.isArray(guildState.activeQuests)) guildState.activeQuests = [];
   if (!guildState.users || typeof guildState.users !== "object") guildState.users = {};
   guildState.refreshAt = Number(guildState.refreshAt) || 0;
   guildState.cycleStartedAt = Number(guildState.cycleStartedAt) || 0;
@@ -314,10 +315,12 @@ const ensureUserState = (guildState, userId) => {
   if (!guildState.users[userId] || typeof guildState.users[userId] !== "object") {
     guildState.users[userId] = {
       activeQuestId: null,
+      activeQuestData: null,
       activeQuestProgress: 0,
       activeQuestLastProgressAt: null,
       activeQuestLastChatCountAt: null,
       questTrashCooldownUntil: null,
+      availableQuests: [],
       acceptedAt: null,
       completedCount: 0,
       completedQuestIds: [],
@@ -328,10 +331,14 @@ const ensureUserState = (guildState, userId) => {
 
   const userState = guildState.users[userId];
   userState.activeQuestId = typeof userState.activeQuestId === "string" ? userState.activeQuestId : null;
+  userState.activeQuestData = userState.activeQuestData && typeof userState.activeQuestData === "object"
+    ? userState.activeQuestData
+    : null;
   userState.activeQuestProgress = Number(userState.activeQuestProgress) || 0;
   userState.activeQuestLastProgressAt = Number(userState.activeQuestLastProgressAt) || null;
   userState.activeQuestLastChatCountAt = Number(userState.activeQuestLastChatCountAt) || null;
   userState.questTrashCooldownUntil = Number(userState.questTrashCooldownUntil) || null;
+  if (!Array.isArray(userState.availableQuests)) userState.availableQuests = [];
   userState.acceptedAt = Number(userState.acceptedAt) || null;
   userState.completedCount = Number(userState.completedCount) || 0;
   userState.questXp = Number(userState.questXp) || 0;
@@ -381,6 +388,56 @@ const buildQuestFromTemplate = (template, cycleId, index) => {
   };
 };
 
+const collectOccupiedQuestKeys = (guildState, excludeUserId = null) => {
+  const occupied = new Set();
+  for (const [otherUserId, otherStateRaw] of Object.entries(guildState.users || {})) {
+    if (excludeUserId && otherUserId === excludeUserId) continue;
+    const otherState = ensureUserState(guildState, otherUserId);
+    if (otherState.activeQuestData?.key) {
+      occupied.add(otherState.activeQuestData.key);
+    }
+    for (const quest of otherState.availableQuests || []) {
+      if (quest?.key) occupied.add(quest.key);
+    }
+  }
+  return occupied;
+};
+
+const pickTemplateForUser = (guildState, userId, avoidKeys = new Set()) => {
+  const occupied = collectOccupiedQuestKeys(guildState, userId);
+  const preferred = ALL_QUEST_TEMPLATES.filter((template) => !avoidKeys.has(template.key) && !occupied.has(template.key));
+  if (preferred.length) return preferred[Math.floor(Math.random() * preferred.length)];
+
+  const fallback = ALL_QUEST_TEMPLATES.filter((template) => !avoidKeys.has(template.key));
+  if (fallback.length) return fallback[Math.floor(Math.random() * fallback.length)];
+
+  return ALL_QUEST_TEMPLATES[Math.floor(Math.random() * ALL_QUEST_TEMPLATES.length)] || null;
+};
+
+const refillUserAvailableQuests = (guildState, userId, now = Date.now(), targetCount = USER_QUEST_CHOICES_COUNT) => {
+  const userState = ensureUserState(guildState, userId);
+  const activeQuest = userState.activeQuestData || null;
+
+  const avoidKeys = new Set((userState.availableQuests || []).map((quest) => quest.key));
+  if (activeQuest?.key) avoidKeys.add(activeQuest.key);
+
+  let guard = 0;
+  while (userState.availableQuests.length < targetCount && guard < 30) {
+    guard += 1;
+    const template = pickTemplateForUser(guildState, userId, avoidKeys);
+    if (!template) break;
+    avoidKeys.add(template.key);
+    const uniqueIndex = userState.availableQuests.length + 1 + Math.floor(Math.random() * 99);
+    userState.availableQuests.push(buildQuestFromTemplate(template, now, uniqueIndex));
+  }
+};
+
+const rerollUserAvailableQuests = (guildState, userId, now = Date.now()) => {
+  const userState = ensureUserState(guildState, userId);
+  userState.availableQuests = [];
+  refillUserAvailableQuests(guildState, userId, now, USER_QUEST_CHOICES_COUNT);
+};
+
 const getQuestLevel = (questXp) => Math.max(1, Math.floor(Number(questXp || 0) / QUEST_LEVEL_XP_STEP) + 1);
 
 const getQuestXpProgress = (questXp) => {
@@ -401,11 +458,7 @@ const generateQuestCycle = (now = Date.now()) => {
   const cycleId = now;
   const refreshAt = now + randomInt(MIN_REFRESH_MS, MAX_REFRESH_MS);
 
-  const chatQuests = shuffle(CHAT_QUEST_TEMPLATES).slice(0, 2).map((template, index) => buildQuestFromTemplate(template, cycleId, index));
-  const voiceQuests = shuffle(VOICE_QUEST_TEMPLATES).slice(0, 2).map((template, index) => buildQuestFromTemplate(template, cycleId, index + chatQuests.length));
-
   return {
-    activeQuests: shuffle([...chatQuests, ...voiceQuests]),
     refreshAt,
     cycleStartedAt: now,
   };
@@ -413,37 +466,58 @@ const generateQuestCycle = (now = Date.now()) => {
 
 const resetGuildQuestCycle = (guildState, now = Date.now()) => {
   const nextCycle = generateQuestCycle(now);
-  guildState.activeQuests = nextCycle.activeQuests;
   guildState.refreshAt = nextCycle.refreshAt;
   guildState.cycleStartedAt = nextCycle.cycleStartedAt;
 
-  for (const userState of Object.values(guildState.users)) {
-    userState.activeQuestId = null;
-    userState.activeQuestProgress = 0;
-    userState.activeQuestLastProgressAt = null;
-    userState.acceptedAt = null;
+  for (const [userId] of Object.entries(guildState.users)) {
+    const safeUserState = ensureUserState(guildState, userId);
+    safeUserState.activeQuestLastChatCountAt = null;
+    rerollUserAvailableQuests(guildState, userId, now);
   }
 };
 
 const ensureCurrentCycle = (guildId, now = Date.now()) => {
   const guildState = ensureGuildState(guildId);
 
-  if (!guildState.activeQuests.length || !guildState.refreshAt || now >= guildState.refreshAt) {
-    resetGuildQuestCycle(guildState, now);
+  if (!guildState.refreshAt || now >= guildState.refreshAt) {
+    const nextCycle = generateQuestCycle(now);
+    guildState.refreshAt = nextCycle.refreshAt;
+    guildState.cycleStartedAt = nextCycle.cycleStartedAt;
+
+    for (const [userId] of Object.entries(guildState.users || {})) {
+      rerollUserAvailableQuests(guildState, userId, now);
+    }
+
     saveStore();
   }
 
   return guildState;
 };
 
-const getActiveQuests = (guildId, now = Date.now()) => {
+const getActiveQuests = (guildId, now = Date.now(), userId = null) => {
   const guildState = ensureCurrentCycle(guildId, now);
-  return guildState.activeQuests;
+  if (!userId) return [];
+  const userState = ensureUserState(guildState, userId);
+  refillUserAvailableQuests(guildState, userId, now, USER_QUEST_CHOICES_COUNT);
+  return userState.availableQuests;
 };
 
-const getQuestById = (guildId, questId, now = Date.now()) => {
-  const quests = getActiveQuests(guildId, now);
-  return quests.find((quest) => quest.id === questId) || null;
+const getQuestById = (guildId, questId, now = Date.now(), userId = null) => {
+  const guildState = ensureCurrentCycle(guildId, now);
+  if (userId) {
+    const userState = ensureUserState(guildState, userId);
+    if (userState.activeQuestData?.id === questId) return userState.activeQuestData;
+    const direct = userState.availableQuests.find((quest) => quest.id === questId) || null;
+    if (direct) return direct;
+  }
+
+  for (const [scanUserId] of Object.entries(guildState.users || {})) {
+    const scanState = ensureUserState(guildState, scanUserId);
+    if (scanState.activeQuestData?.id === questId) return scanState.activeQuestData;
+    const found = scanState.availableQuests.find((quest) => quest.id === questId);
+    if (found) return found;
+  }
+  return null;
 };
 
 const trimQuestHistory = (history) => history.slice(0, QUEST_HISTORY_LIMIT);
@@ -456,12 +530,16 @@ const appendQuestHistory = (userState, entry) => {
 const getUserQuestState = (guildId, userId, now = Date.now()) => {
   const guildState = ensureCurrentCycle(guildId, now);
   const userState = ensureUserState(guildState, userId);
-  const activeQuest = userState.activeQuestId
-    ? guildState.activeQuests.find((quest) => quest.id === userState.activeQuestId) || null
-    : null;
+  refillUserAvailableQuests(guildState, userId, now, USER_QUEST_CHOICES_COUNT);
+  const activeQuest = userState.activeQuestData && userState.activeQuestData.id === userState.activeQuestId
+    ? userState.activeQuestData
+    : (userState.activeQuestId
+      ? userState.availableQuests.find((quest) => quest.id === userState.activeQuestId) || null
+      : null);
 
   if (userState.activeQuestId && !activeQuest) {
     userState.activeQuestId = null;
+    userState.activeQuestData = null;
     userState.activeQuestProgress = 0;
     userState.activeQuestLastProgressAt = null;
     userState.acceptedAt = null;
@@ -477,7 +555,7 @@ const getUserQuestState = (guildId, userId, now = Date.now()) => {
 
 const acceptQuest = (guildId, userId, questId, now = Date.now()) => {
   const { guildState, userState } = getUserQuestState(guildId, userId, now);
-  const quest = guildState.activeQuests.find((entry) => entry.id === questId) || null;
+  const quest = userState.availableQuests.find((entry) => entry.id === questId) || null;
 
   if (!quest) {
     return { ok: false, reason: "That quest is no longer available.", quest: null };
@@ -499,10 +577,13 @@ const acceptQuest = (guildId, userId, questId, now = Date.now()) => {
   }
 
   userState.activeQuestId = quest.id;
+  userState.activeQuestData = quest;
   userState.activeQuestProgress = 0;
   userState.activeQuestLastProgressAt = null;
   userState.activeQuestLastChatCountAt = null;
   userState.acceptedAt = now;
+  userState.availableQuests = userState.availableQuests.filter((entry) => entry.id !== quest.id);
+  refillUserAvailableQuests(guildState, userId, now, USER_QUEST_CHOICES_COUNT);
   saveStore();
 
   return { ok: true, reason: null, quest };
@@ -514,18 +595,21 @@ const getTrashCooldownRemainingMs = (guildId, userId, now = Date.now()) => {
 };
 
 const trashActiveQuest = (guildId, userId, now = Date.now()) => {
-  const { userState, activeQuest } = getUserQuestState(guildId, userId, now);
+  const { guildState, userState, activeQuest } = getUserQuestState(guildId, userId, now);
 
   if (!activeQuest) {
     return { ok: false, reason: "You do not have an active quest to trash.", quest: null };
   }
 
   userState.activeQuestId = null;
+  userState.activeQuestData = null;
   userState.activeQuestProgress = 0;
   userState.activeQuestLastProgressAt = null;
   userState.activeQuestLastChatCountAt = null;
   userState.acceptedAt = null;
   userState.questTrashCooldownUntil = now + QUEST_TRASH_COOLDOWN_MS;
+  userState.availableQuests = userState.availableQuests.filter((entry) => entry.id !== activeQuest.id);
+  refillUserAvailableQuests(guildState, userId, now, USER_QUEST_CHOICES_COUNT);
   saveStore();
 
   return {
@@ -539,6 +623,7 @@ const trashActiveQuest = (guildId, userId, now = Date.now()) => {
 const clearActiveQuest = (guildId, userId, now = Date.now()) => {
   const { userState } = getUserQuestState(guildId, userId, now);
   userState.activeQuestId = null;
+  userState.activeQuestData = null;
   userState.activeQuestProgress = 0;
   userState.activeQuestLastProgressAt = null;
   userState.activeQuestLastChatCountAt = null;
@@ -576,10 +661,13 @@ const completeQuestIfReady = (guildId, userId, now = Date.now()) => {
     levelAfter: newLevel,
   });
   userState.activeQuestId = null;
+  userState.activeQuestData = null;
   userState.activeQuestProgress = 0;
   userState.activeQuestLastProgressAt = null;
   userState.activeQuestLastChatCountAt = null;
   userState.acceptedAt = null;
+  userState.availableQuests = userState.availableQuests.filter((entry) => entry.id !== activeQuest.id);
+  refillUserAvailableQuests(guildState, userId, now, USER_QUEST_CHOICES_COUNT);
   saveStore();
 
   return {
@@ -775,7 +863,7 @@ const formatRelativeDuration = (targetMs, now = Date.now()) => {
 };
 
 const buildQuestBoardPayload = (guildId, userId = null, now = Date.now()) => {
-  const quests = getActiveQuests(guildId, now);
+  const quests = userId ? getActiveQuests(guildId, now, userId) : [];
   const refreshAt = ensureGuildState(guildId).refreshAt;
   const userState = userId ? getUserQuestState(guildId, userId, now).userState : null;
   const profileXp = userState ? getQuestXpProgress(userState.questXp) : null;
@@ -786,9 +874,7 @@ const buildQuestBoardPayload = (guildId, userId = null, now = Date.now()) => {
     .setDescription("Pick one quest to accept. Quests refresh every 2 to 3 hours.");
 
   if (userState) {
-    const activeQuest = userState.activeQuestId
-      ? quests.find((quest) => quest.id === userState.activeQuestId) || null
-      : null;
+    const activeQuest = getUserQuestState(guildId, userId, now).activeQuest;
 
     embed.addFields({
       name: "Your Quest Profile",
@@ -813,15 +899,16 @@ const buildQuestBoardPayload = (guildId, userId = null, now = Date.now()) => {
 
   embed.setFooter({ text: `Next refresh in ${refreshAt ? formatRelativeDuration(refreshAt, now) : "soon"}` });
 
-  const row = new ActionRowBuilder().addComponents(
-    ...quests.map((quest, index) =>
+  const row = new ActionRowBuilder();
+  for (const [index, quest] of quests.slice(0, 5).entries()) {
+    row.addComponents(
       new ButtonBuilder()
         .setCustomId(`${QUEST_PANEL_BUTTON_PREFIX}${quest.id}`)
         .setLabel(`Accept ${index + 1}`)
         .setEmoji(quest.kind === "voice" ? "🎧" : "💬")
         .setStyle(quest.kind === "voice" ? ButtonStyle.Success : ButtonStyle.Primary)
-    )
-  );
+    );
+  }
 
   const controlsRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
@@ -831,12 +918,12 @@ const buildQuestBoardPayload = (guildId, userId = null, now = Date.now()) => {
       .setDisabled(!userState?.activeQuestId)
   );
 
-  return { embeds: [embed], components: [row, controlsRow] };
+  const components = row.components.length ? [row, controlsRow] : [controlsRow];
+  return { embeds: [embed], components };
 };
 
 const buildQuestStatsPayload = (guildId, userId, now = Date.now()) => {
-  const { userState } = getUserQuestState(guildId, userId, now);
-  const activeQuest = userState.activeQuestId ? getQuestById(guildId, userState.activeQuestId, now) : null;
+  const { userState, activeQuest } = getUserQuestState(guildId, userId, now);
   const xp = getQuestXpProgress(userState.questXp);
 
   const embed = new EmbedBuilder()
