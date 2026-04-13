@@ -180,6 +180,8 @@ const suggestions = require("./features/suggestions");
 suggestions();
 const quest = require("./features/quest");
 quest();
+const tickets = require("./features/tickets");
+tickets();
 client.login(token).catch((err) => {
     console.error("Failed to login Discord client:", err?.message || err);
     process.exit(1);

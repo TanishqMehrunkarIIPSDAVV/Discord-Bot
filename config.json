@@ -16,6 +16,14 @@
   "complaintAdminChannelId": "1473331580972961905",
   "suggestionButtonChannelId": "1491921404298395748",
   "suggestionPostChannelId": "1491921828359180380",
+  "ticketPanelChannelId": "1493239079272190142",
+  "ticketCategoryId": "1493238860971511920",
+  "ticketTranscriptChannelId": "1493239438514458844",
+  "ticketAdminRoleIds": [
+    "1439971904260800618",
+    "1488121128361656330"
+  ],
+  "ticketSupportRoleIds": [],
   "confessionAdminChannelId": "1473348273111568455",
   "privateVcTriggerChannelId": "1473620278759133194",
   "vcAutoDisconnectEnabled": true,

@@ -68,6 +68,7 @@ const auditLogs = () => {
     voice: process.env.VOICE_LOG_CHANNEL_ID || cfg.voiceLogChannelId,
     mod: process.env.MOD_LOG_CHANNEL_ID || cfg.modLogChannelId,
   };
+  const ticketCategoryId = process.env.TICKET_CATEGORY_ID || cfg.ticketCategoryId || "";
 
   // Shared fallback if a specific type is missing
   const sharedFallback = process.env.MESSAGE_AUDIT_LOG_CHANNEL_ID || cfg.messageLogChannelId;
@@ -556,6 +557,17 @@ const auditLogs = () => {
     if (!channel) return false;
     return channel.type === ChannelType.GuildVoice && channel.name?.endsWith("-vc");
   };
+  const isTicketChannel = (channel) => {
+    if (!channel) return false;
+
+    if (ticketCategoryId && channel.parentId === ticketCategoryId) return true;
+    if (typeof channel.name === "string" && channel.name.startsWith("ticket-")) return true;
+
+    const topic = String(channel.topic || "");
+    if (topic.includes("ticket-owner:") || topic.includes("ticket-status:")) return true;
+
+    return false;
+  };
 
   // Channels
   client.on("channelCreate", async (channel) => {
@@ -565,6 +577,7 @@ const auditLogs = () => {
       if (isPrivateVoiceChannel(channel)) return;
       // Skip logging confession and complaint channels
       if (channel.name?.startsWith("confession-") || channel.name?.startsWith("complaint-")) return;
+      if (isTicketChannel(channel)) return;
       const executor = await getExecutor(channel.guild, { types: AuditLogEvent.ChannelCreate, targetId: channel.id });
       const embed = new EmbedBuilder()
         .setColor("#22C55E")
@@ -587,6 +600,7 @@ const auditLogs = () => {
       if (isPrivateVoiceChannel(channel)) return;
       // Skip logging confession and complaint channels
       if (channel.name?.startsWith("confession-") || channel.name?.startsWith("complaint-")) return;
+      if (isTicketChannel(channel)) return;
       const executor = await getExecutor(channel.guild, { types: AuditLogEvent.ChannelDelete, targetId: channel.id });
       const embed = new EmbedBuilder()
         .setColor("#EF4444")
@@ -609,6 +623,7 @@ const auditLogs = () => {
       if (isPrivateVoiceChannel(newChannel)) return;
       // Skip logging confession and complaint channels
       if (newChannel.name?.startsWith("confession-") || newChannel.name?.startsWith("complaint-")) return;
+      if (isTicketChannel(newChannel)) return;
       const changes = [];
       if (oldChannel.name !== newChannel.name) changes.push(`Name: ${oldChannel.name} → ${newChannel.name}`);
       if ("rateLimitPerUser" in newChannel && oldChannel.rateLimitPerUser !== newChannel.rateLimitPerUser) {
