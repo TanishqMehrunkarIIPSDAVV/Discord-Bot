@@ -23,6 +23,7 @@ const {
   stopVoiceQuestTimer,
   tickVoiceQuestProgress,
 } = require("../utils/questStore");
+const { isQuestBlockedChannel, QUEST_BLOCKED_MESSAGE } = require("../utils/questChannelBlock");
 
 let registered = false;
 let refreshTicker = null;
@@ -223,6 +224,11 @@ const quest = () => {
     const questView = parseQuestView(content);
 
     if (questView) {
+      if (isQuestBlockedChannel(message.channel)) {
+        await message.reply({ content: QUEST_BLOCKED_MESSAGE, allowedMentions: { repliedUser: false } }).catch(() => {});
+        return;
+      }
+
       try {
         let payload;
         if (questView.view === "stats") {
@@ -274,6 +280,10 @@ const quest = () => {
           return interaction.reply({ content: "Quests only work in servers.", ephemeral: true }).catch(() => {});
         }
 
+        if (isQuestBlockedChannel(interaction.channel)) {
+          return interaction.reply({ content: QUEST_BLOCKED_MESSAGE, ephemeral: true }).catch(() => {});
+        }
+
         const result = trashActiveQuest(interaction.guild.id, interaction.user.id);
         if (!result.ok) {
           return interaction.reply({ content: result.reason || "No active quest to trash.", ephemeral: true }).catch(() => {});
@@ -290,6 +300,10 @@ const quest = () => {
 
       if (!interaction.guild) {
         return interaction.reply({ content: "Quests only work in servers.", ephemeral: true }).catch(() => {});
+      }
+
+      if (isQuestBlockedChannel(interaction.channel)) {
+        return interaction.reply({ content: QUEST_BLOCKED_MESSAGE, ephemeral: true }).catch(() => {});
       }
 
       const questId = interaction.customId.slice(QUEST_PANEL_BUTTON_PREFIX.length);

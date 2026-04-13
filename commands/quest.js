@@ -6,6 +6,7 @@ const {
   buildQuestStatsPayload,
   trashActiveQuest,
 } = require("../utils/questStore");
+const { isQuestBlockedChannel, QUEST_BLOCKED_MESSAGE } = require("../utils/questChannelBlock");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -35,6 +36,10 @@ module.exports = {
   async execute(interaction) {
     if (!interaction.guild) {
       return interaction.reply({ content: "Quests only work in servers.", ephemeral: true });
+    }
+
+    if (isQuestBlockedChannel(interaction.channel)) {
+      return interaction.reply({ content: QUEST_BLOCKED_MESSAGE, ephemeral: true });
     }
 
     const view = (interaction.options.getString("view") || "board").toLowerCase();
