@@ -1,4 +1,10 @@
 {
-  "guilds": {},
-  "updatedAt": 0
+  "guilds": {
+    "test-guild": {
+      "refreshAt": 1776121446572,
+      "cycleStartedAt": 1776111840788,
+      "users": {}
+    }
+  },
+  "updatedAt": 1776111840788
 }

@@ -33,6 +33,15 @@ const isPrefixCommandMessage = (content) => {
   return lower === "ct" || lower.startsWith("ct ");
 };
 
+const isHelpfulReplyMessage = (message) => {
+  if (!message || !message.guild || message.author?.bot) return false;
+  const contentLength = String(message.content || "").trim().length;
+  if (contentLength < 12) return false;
+  if (message.reference?.messageId) return true;
+  const mentionCount = Number(message.mentions?.users?.filter((user) => !user.bot).size || 0);
+  return mentionCount > 0;
+};
+
 const sendQuestPanel = async (destination, guildId, userId = null, now = Date.now()) => {
   const payload = buildQuestBoardPayload(guildId, userId, now);
   return destination.send(payload);
@@ -44,6 +53,10 @@ const buildQuestCompletionText = (member, completion) => {
 
   if (Number(completion.rewardXp || 0) > 0) {
     lines.push(`Reward: **+${completion.rewardXp} XP**`);
+  }
+
+  if (Number(completion.rewardCoins || 0) > 0) {
+    lines.push(`Coins: **+${completion.rewardCoins}**`);
   }
 
   if (completion.leveledUp && completion.newLevel) {
@@ -259,21 +272,70 @@ const quest = () => {
       return;
     }
 
-    if (!isPrefixCommandMessage(content)) return;
-
-    const { activeQuest } = getUserQuestState(message.guild.id, message.author.id);
-    if (!activeQuest || activeQuest.kind !== "chat") return;
-
     const progressResult = addQuestProgress(message.guild.id, message.author.id, {
       amount: 1,
       messageContent: content,
+      eventType: "message",
+      isHelpfulReply: isHelpfulReplyMessage(message),
     });
     if (progressResult?.completed) {
       await handleQuestCompletion(message.member, progressResult, message.channel);
+      return;
+    }
+
+    if (isPrefixCommandMessage(content)) {
+      const commandProgress = addQuestProgress(message.guild.id, message.author.id, {
+        amount: 1,
+        eventType: "command",
+      });
+      if (commandProgress?.completed) {
+        await handleQuestCompletion(message.member, commandProgress, message.channel);
+      }
+    }
+  });
+
+  client.on("messageReactionAdd", async (reaction, user) => {
+    try {
+      if (user?.bot) return;
+
+      if (reaction.partial) {
+        await reaction.fetch().catch(() => null);
+      }
+
+      const guild = reaction.message?.guild;
+      if (!guild) return;
+
+      const member = guild.members.cache.get(user.id) || await guild.members.fetch(user.id).catch(() => null);
+      if (!member || member.user.bot) return;
+
+      const progressResult = addQuestProgress(guild.id, user.id, {
+        amount: 1,
+        eventType: "reaction",
+      });
+
+      if (progressResult?.completed) {
+        await handleQuestCompletion(member, progressResult, reaction.message.channel);
+      }
+    } catch (error) {
+      console.error("quest reaction update error:", error);
     }
   });
 
   client.on("interactionCreate", async (interaction) => {
+    if (interaction.isChatInputCommand() && interaction.guild && !interaction.user.bot) {
+      const progressResult = addQuestProgress(interaction.guild.id, interaction.user.id, {
+        amount: 1,
+        eventType: "command",
+      });
+
+      if (progressResult?.completed) {
+        const member = interaction.member || await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+        if (member) {
+          await handleQuestCompletion(member, progressResult, interaction.channel);
+        }
+      }
+    }
+
     if (interaction.isButton()) {
       if (interaction.customId === QUEST_TRASH_BUTTON_ID) {
         if (!interaction.guild) {

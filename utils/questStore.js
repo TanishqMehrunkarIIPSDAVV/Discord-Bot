@@ -12,254 +12,67 @@ const QUEST_HISTORY_LIMIT = 20;
 const ECHO_CHAT_COOLDOWN_MS = 8_000;
 const QUEST_TRASH_COOLDOWN_MS = 3 * 60 * 1000;
 const USER_QUEST_CHOICES_COUNT = 4;
+const QUEST_CATALOG_PATH = path.join(__dirname, "..", "data", "quest-catalog.json");
 
-const CHAT_QUEST_TEMPLATES = [
-  {
-    key: "chat-sprint",
-    icon: "💬",
-    title: "Chat Sprint",
-    kind: "chat",
-    unit: "messages",
-    minTarget: 12,
-    maxTarget: 18,
-    rewardXpMin: 20,
-    rewardXpMax: 30,
-    buildDescription: (target) => `Send ${target} messages in any server text channel.`,
-  },
-  {
-    key: "chat-marathon",
-    icon: "🏃",
-    title: "Chat Marathon",
-    kind: "chat",
-    unit: "messages",
-    minTarget: 24,
-    maxTarget: 34,
-    rewardXpMin: 34,
-    rewardXpMax: 48,
-    buildDescription: (target) => `Keep the momentum and send ${target} messages today.`,
-  },
-  {
-    key: "conversation-driver",
-    icon: "🗣️",
-    title: "Conversation Driver",
-    kind: "chat",
-    unit: "messages",
-    minTarget: 20,
-    maxTarget: 28,
-    rewardXpMin: 28,
-    rewardXpMax: 40,
-    buildDescription: (target) => `Keep the chat moving by sending ${target} messages.`,
-  },
-  {
-    key: "topic-starter",
-    icon: "🧠",
-    title: "Topic Starter",
-    kind: "chat",
-    unit: "messages",
-    minTarget: 14,
-    maxTarget: 20,
-    rewardXpMin: 22,
-    rewardXpMax: 32,
-    buildDescription: (target) => `Start fresh conversations and send ${target} thoughtful messages.`,
-  },
-  {
-    key: "chat-burst",
-    icon: "⚡",
-    title: "Chat Burst",
-    kind: "chat",
-    unit: "messages",
-    minTarget: 8,
-    maxTarget: 14,
-    rewardXpMin: 15,
-    rewardXpMax: 24,
-    buildDescription: (target) => `Fire off ${target} messages without leaving the server chat flow.`,
-  },
-  {
-    key: "echo-word",
-    icon: "🪞",
-    title: "Echo Word",
-    kind: "chat",
-    unit: "messages",
-    minTarget: 4,
-    maxTarget: 7,
-    rewardXpMin: 20,
-    rewardXpMax: 34,
-    chatMode: "echo_phrase",
-    repeatWordCount: 3,
-    buildDescription: (target) =>
-      `Send ${target} quality messages where one word repeats at least 3 times (example: chai chai chai). Keep it natural, no spam floods.`,
-  },
-  {
-    key: "emoji-vibes",
-    icon: "😄",
-    title: "Emoji Vibes",
-    kind: "chat",
-    unit: "messages",
-    minTarget: 10,
-    maxTarget: 16,
-    rewardXpMin: 18,
-    rewardXpMax: 26,
-    buildDescription: (target) => `Light up the chat and send ${target} lively messages.`,
-  },
-  {
-    key: "chat-comeback",
-    icon: "🔁",
-    title: "Chat Comeback",
-    kind: "chat",
-    unit: "messages",
-    minTarget: 16,
-    maxTarget: 24,
-    rewardXpMin: 24,
-    rewardXpMax: 36,
-    buildDescription: (target) => `Drop back into chat and complete ${target} messages this cycle.`,
-  },
-];
+const CATEGORY_ICON_MAP = {
+  chat: "💬",
+  community: "🤝",
+  voice: "🎧",
+  fun: "🎮",
+  streak: "🔥",
+};
 
-const VOICE_QUEST_TEMPLATES = [
-  {
-    key: "vc-warmup",
-    icon: "🎧",
-    title: "VC Warmup",
-    kind: "voice",
-    unit: "minutes",
-    minTarget: 10,
-    maxTarget: 15,
-    rewardXpMin: 35,
-    rewardXpMax: 48,
-    buildDescription: (target) => `Stay in a voice channel for ${target} minutes.`,
-  },
-  {
-    key: "vc-quick-pop",
-    icon: "🎯",
-    title: "Quick VC Pop",
-    kind: "voice",
-    unit: "minutes",
-    minTarget: 8,
-    maxTarget: 12,
-    rewardXpMin: 28,
-    rewardXpMax: 40,
-    buildDescription: (target) => `Hop into VC and hang around for ${target} minutes.`,
-  },
-  {
-    key: "vc-hangout",
-    icon: "🔊",
-    title: "VC Hangout",
-    kind: "voice",
-    unit: "minutes",
-    minTarget: 18,
-    maxTarget: 25,
-    rewardXpMin: 45,
-    rewardXpMax: 60,
-    buildDescription: (target) => `Spend ${target} minutes in voice chat.`,
-  },
-  {
-    key: "vc-campfire",
-    icon: "🔥",
-    title: "VC Campfire",
-    kind: "voice",
-    unit: "minutes",
-    minTarget: 15,
-    maxTarget: 22,
-    rewardXpMin: 40,
-    rewardXpMax: 55,
-    buildDescription: (target) => `Sit back and keep a voice conversation going for ${target} minutes.`,
-  },
-  {
-    key: "duo-session",
-    icon: "👥",
-    title: "Duo Session",
-    kind: "voice",
-    unit: "minutes",
-    minTarget: 10,
-    maxTarget: 16,
-    rewardXpMin: 44,
-    rewardXpMax: 62,
-    requiredMembers: 2,
-    voiceMode: "active",
-    buildDescription: (target) => `Stay in VC with at least 1 other person for ${target} minutes.`,
-  },
-  {
-    key: "trio-party",
-    icon: "🧑‍🤝‍🧑",
-    title: "Trio Party",
-    kind: "voice",
-    unit: "minutes",
-    minTarget: 9,
-    maxTarget: 14,
-    rewardXpMin: 52,
-    rewardXpMax: 72,
-    requiredMembers: 3,
-    voiceMode: "active",
-    buildDescription: (target) => `Stay in VC with at least 2 other people for ${target} minutes.`,
-  },
-  {
-    key: "muted-monk",
-    icon: "🔇",
-    title: "Muted Monk",
-    kind: "voice",
-    unit: "minutes",
-    minTarget: 6,
-    maxTarget: 10,
-    rewardXpMin: 26,
-    rewardXpMax: 38,
-    voiceMode: "muted",
-    buildDescription: (target) => `Stay muted in VC for ${target} minutes as a meme challenge.`,
-  },
-  {
-    key: "deaf-mode",
-    icon: "🙉",
-    title: "Deafen Mode",
-    kind: "voice",
-    unit: "minutes",
-    minTarget: 4,
-    maxTarget: 8,
-    rewardXpMin: 22,
-    rewardXpMax: 34,
-    voiceMode: "deafened",
-    buildDescription: (target) => `Stay deafened in VC for ${target} minutes as a joking quest.`,
-  },
-  {
-    key: "vc-deep-session",
-    icon: "🎙️",
-    title: "Deep VC Session",
-    kind: "voice",
-    unit: "minutes",
-    minTarget: 25,
-    maxTarget: 35,
-    rewardXpMin: 60,
-    rewardXpMax: 80,
-    voiceMode: "active",
-    buildDescription: (target) => `Stick around in voice chat for ${target} minutes.`,
-  },
-  {
-    key: "vc-night-shift",
-    icon: "🌙",
-    title: "VC Night Shift",
-    kind: "voice",
-    unit: "minutes",
-    minTarget: 28,
-    maxTarget: 40,
-    rewardXpMin: 66,
-    rewardXpMax: 90,
-    voiceMode: "active",
-    buildDescription: (target) => `Hold a long VC session and stay connected for ${target} minutes.`,
-  },
-  {
-    key: "vc-lounge",
-    icon: "🛋️",
-    title: "VC Lounge",
-    kind: "voice",
-    unit: "minutes",
-    minTarget: 20,
-    maxTarget: 30,
-    rewardXpMin: 50,
-    rewardXpMax: 70,
-    voiceMode: "active",
-    buildDescription: (target) => `Chill in voice and complete ${target} minutes of active presence.`,
-  },
-];
+const GOAL_KIND_MAP = {
+  messages: "chat",
+  helpful_replies: "chat",
+  voice_minutes: "voice",
+  reactions: "reaction",
+  commands_used: "command",
+  streak_days: "streak",
+};
 
-const ALL_QUEST_TEMPLATES = [...CHAT_QUEST_TEMPLATES, ...VOICE_QUEST_TEMPLATES];
+const GOAL_UNIT_MAP = {
+  messages: "messages",
+  helpful_replies: "messages",
+  voice_minutes: "minutes",
+  reactions: "reactions",
+  commands_used: "commands",
+  streak_days: "days",
+};
+
+const loadQuestCatalog = () => {
+  try {
+    const raw = fs.readFileSync(QUEST_CATALOG_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((entry) => entry && typeof entry === "object")
+      .map((entry) => ({
+        id: Number(entry.id),
+        key: `catalog-${Number(entry.id)}`,
+        icon: CATEGORY_ICON_MAP[String(entry.category || "").toLowerCase()] || "🎯",
+        title: String(entry.title || `Quest ${entry.id}`),
+        description: String(entry.description || "Complete this quest objective."),
+        category: String(entry.category || "misc").toLowerCase(),
+        difficulty: String(entry.difficulty || "easy").toLowerCase(),
+        goalType: String(entry.goalType || "messages").toLowerCase(),
+        kind: GOAL_KIND_MAP[String(entry.goalType || "").toLowerCase()] || "chat",
+        unit: GOAL_UNIT_MAP[String(entry.goalType || "").toLowerCase()] || "messages",
+        target: Math.max(1, Number(entry.target) || 1),
+        rewardXp: Math.max(0, Number(entry.rewardXp) || 0),
+        rewardCoins: Math.max(0, Number(entry.rewardCoins) || 0),
+        timeLimitHours: Math.max(1, Number(entry.timeLimitHours) || 24),
+        isDaily: Boolean(entry.isDaily),
+        isRepeatable: Boolean(entry.isRepeatable),
+      }))
+      .filter((entry) => Number.isFinite(entry.id));
+  } catch {
+    return [];
+  }
+};
+
+const ALL_QUEST_TEMPLATES = loadQuestCatalog();
+const QUEST_TEMPLATE_BY_KEY = new Map(ALL_QUEST_TEMPLATES.map((template) => [template.key, template]));
 
 let cache = null;
 
@@ -325,6 +138,7 @@ const ensureUserState = (guildState, userId) => {
       completedCount: 0,
       completedQuestIds: [],
       questXp: 0,
+      questCoins: 0,
       questHistory: [],
     };
   }
@@ -342,6 +156,7 @@ const ensureUserState = (guildState, userId) => {
   userState.acceptedAt = Number(userState.acceptedAt) || null;
   userState.completedCount = Number(userState.completedCount) || 0;
   userState.questXp = Number(userState.questXp) || 0;
+  userState.questCoins = Number(userState.questCoins) || 0;
   if (!Array.isArray(userState.completedQuestIds)) userState.completedQuestIds = [];
   if (!Array.isArray(userState.questHistory)) userState.questHistory = [];
 
@@ -363,27 +178,29 @@ const shuffle = (items) => {
   return clone;
 };
 
-const pickQuestTarget = (template) => randomInt(template.minTarget, template.maxTarget);
-
-const pickQuestRewardXp = (template) => randomInt(template.rewardXpMin, template.rewardXpMax);
-
 const buildQuestFromTemplate = (template, cycleId, index) => {
-  const target = pickQuestTarget(template);
-  const rewardXp = pickQuestRewardXp(template);
+  const baseId = Number.isFinite(Number(template.id)) ? Number(template.id) : index + 1;
   return {
-    id: `${cycleId}-${index + 1}-${template.key}`,
+    id: `${cycleId}-${baseId}-${template.key}`,
     key: template.key,
     icon: template.icon,
     title: template.title,
     kind: template.kind,
+    goalType: template.goalType,
+    category: template.category,
+    difficulty: template.difficulty,
     unit: template.unit,
-    chatMode: template.chatMode || null,
-    repeatWordCount: Number(template.repeatWordCount) || 0,
-    voiceMode: template.voiceMode || (template.kind === "voice" ? "active" : null),
-    requiredMembers: Number(template.requiredMembers) || 1,
-    target,
-    rewardXp,
-    description: template.buildDescription(target),
+    chatMode: null,
+    repeatWordCount: 0,
+    voiceMode: "active",
+    requiredMembers: 1,
+    target: Number(template.target) || 1,
+    rewardXp: Number(template.rewardXp) || 0,
+    rewardCoins: Number(template.rewardCoins) || 0,
+    timeLimitHours: Number(template.timeLimitHours) || 24,
+    isDaily: Boolean(template.isDaily),
+    isRepeatable: Boolean(template.isRepeatable),
+    description: template.description,
     createdAt: cycleId,
   };
 };
@@ -403,12 +220,14 @@ const collectOccupiedQuestKeys = (guildState, excludeUserId = null) => {
   return occupied;
 };
 
-const pickTemplateForUser = (guildState, userId, avoidKeys = new Set()) => {
+const pickTemplateForUser = (guildState, userId, avoidKeys = new Set(), disallowedKeys = new Set()) => {
   const occupied = collectOccupiedQuestKeys(guildState, userId);
-  const preferred = ALL_QUEST_TEMPLATES.filter((template) => !avoidKeys.has(template.key) && !occupied.has(template.key));
+  const preferred = ALL_QUEST_TEMPLATES.filter(
+    (template) => !avoidKeys.has(template.key) && !occupied.has(template.key) && !disallowedKeys.has(template.key)
+  );
   if (preferred.length) return preferred[Math.floor(Math.random() * preferred.length)];
 
-  const fallback = ALL_QUEST_TEMPLATES.filter((template) => !avoidKeys.has(template.key));
+  const fallback = ALL_QUEST_TEMPLATES.filter((template) => !avoidKeys.has(template.key) && !disallowedKeys.has(template.key));
   if (fallback.length) return fallback[Math.floor(Math.random() * fallback.length)];
 
   return ALL_QUEST_TEMPLATES[Math.floor(Math.random() * ALL_QUEST_TEMPLATES.length)] || null;
@@ -421,10 +240,20 @@ const refillUserAvailableQuests = (guildState, userId, now = Date.now(), targetC
   const avoidKeys = new Set((userState.availableQuests || []).map((quest) => quest.key));
   if (activeQuest?.key) avoidKeys.add(activeQuest.key);
 
+  const disallowedKeys = new Set();
+  for (const historyEntry of userState.questHistory || []) {
+    const key = historyEntry?.key;
+    if (!key) continue;
+    const sourceTemplate = QUEST_TEMPLATE_BY_KEY.get(key);
+    if (sourceTemplate && !sourceTemplate.isRepeatable) {
+      disallowedKeys.add(key);
+    }
+  }
+
   let guard = 0;
   while (userState.availableQuests.length < targetCount && guard < 30) {
     guard += 1;
-    const template = pickTemplateForUser(guildState, userId, avoidKeys);
+    const template = pickTemplateForUser(guildState, userId, avoidKeys, disallowedKeys);
     if (!template) break;
     avoidKeys.add(template.key);
     const uniqueIndex = userState.availableQuests.length + 1 + Math.floor(Math.random() * 99);
@@ -494,6 +323,18 @@ const ensureCurrentCycle = (guildId, now = Date.now()) => {
   return guildState;
 };
 
+const forceRefreshGuildQuestCycle = (guildId, now = Date.now()) => {
+  const guildState = ensureGuildState(guildId);
+  resetGuildQuestCycle(guildState, now);
+  saveStore();
+
+  return {
+    refreshAt: guildState.refreshAt,
+    cycleStartedAt: guildState.cycleStartedAt,
+    usersAffected: Object.keys(guildState.users || {}).length,
+  };
+};
+
 const getActiveQuests = (guildId, now = Date.now(), userId = null) => {
   const guildState = ensureCurrentCycle(guildId, now);
   if (!userId) return [];
@@ -527,9 +368,35 @@ const appendQuestHistory = (userState, entry) => {
   userState.questHistory = trimQuestHistory([entry, ...currentHistory]);
 };
 
+const isQuestExpired = (quest, acceptedAt, now = Date.now()) => {
+  if (!quest) return false;
+  const startedAt = Number(acceptedAt) || 0;
+  if (!startedAt) return false;
+  const timeLimitHours = Math.max(1, Number(quest.timeLimitHours) || 24);
+  return now >= startedAt + timeLimitHours * 60 * 60 * 1000;
+};
+
+const clearExpiredActiveQuest = (guildState, userState, userId, now = Date.now()) => {
+  const activeQuest = userState.activeQuestData;
+  if (!userState.activeQuestId || !activeQuest) return false;
+  if (!isQuestExpired(activeQuest, userState.acceptedAt, now)) return false;
+
+  userState.activeQuestId = null;
+  userState.activeQuestData = null;
+  userState.activeQuestProgress = 0;
+  userState.activeQuestLastProgressAt = null;
+  userState.activeQuestLastChatCountAt = null;
+  userState.acceptedAt = null;
+  userState.availableQuests = userState.availableQuests.filter((entry) => entry.id !== activeQuest.id);
+  refillUserAvailableQuests(guildState, userId, now, USER_QUEST_CHOICES_COUNT);
+  saveStore();
+  return true;
+};
+
 const getUserQuestState = (guildId, userId, now = Date.now()) => {
   const guildState = ensureCurrentCycle(guildId, now);
   const userState = ensureUserState(guildState, userId);
+  clearExpiredActiveQuest(guildState, userState, userId, now);
   refillUserAvailableQuests(guildState, userId, now, USER_QUEST_CHOICES_COUNT);
   const activeQuest = userState.activeQuestData && userState.activeQuestData.id === userState.activeQuestId
     ? userState.activeQuestData
@@ -640,6 +507,7 @@ const completeQuestIfReady = (guildId, userId, now = Date.now()) => {
   }
 
   const rewardXp = Number(activeQuest.rewardXp) || 0;
+  const rewardCoins = Number(activeQuest.rewardCoins) || 0;
   const previousQuestXp = Number(userState.questXp) || 0;
   const previousLevel = getQuestLevel(previousQuestXp);
   const newQuestXp = previousQuestXp + rewardXp;
@@ -648,13 +516,16 @@ const completeQuestIfReady = (guildId, userId, now = Date.now()) => {
   userState.completedCount = Number(userState.completedCount) + 1;
   userState.completedQuestIds.push(activeQuest.id);
   userState.questXp = newQuestXp;
+  userState.questCoins = Number(userState.questCoins || 0) + rewardCoins;
   appendQuestHistory(userState, {
     questId: activeQuest.id,
     key: activeQuest.key,
     title: activeQuest.title,
     kind: activeQuest.kind,
+    goalType: activeQuest.goalType,
     target: activeQuest.target,
     rewardXp,
+    rewardCoins,
     acceptedAt: userState.acceptedAt,
     completedAt: now,
     levelBefore: previousLevel,
@@ -675,10 +546,12 @@ const completeQuestIfReady = (guildId, userId, now = Date.now()) => {
     quest: activeQuest,
     guildState,
     rewardXp,
+    rewardCoins,
     previousLevel,
     newLevel,
     leveledUp: newLevel > previousLevel,
     questXp: newQuestXp,
+    questCoins: userState.questCoins,
   };
 };
 
@@ -699,25 +572,107 @@ const doesEchoChatMessageQualify = (messageContent, repeatWordCount = 3) => {
   return maxRepeat >= Math.max(3, Number(repeatWordCount) || 3);
 };
 
+const getUtcDayKey = (timestampMs) => {
+  const date = new Date(Number(timestampMs) || Date.now());
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+};
+
 const addQuestProgress = (guildId, userId, input = 1, now = Date.now()) => {
   const { userState, activeQuest } = getUserQuestState(guildId, userId, now);
 
-  if (!activeQuest || activeQuest.kind !== "chat") {
+  if (!activeQuest) {
     return { updated: false, completed: false, quest: activeQuest, progress: userState.activeQuestProgress };
   }
 
   let safeAmount = 1;
   let messageContent = "";
+  let eventType = "message";
+  let isHelpfulReply = false;
 
   if (typeof input === "number") {
     safeAmount = Number(input);
   } else if (input && typeof input === "object") {
     safeAmount = Number(input.amount || 1);
     messageContent = String(input.messageContent || "");
+    eventType = String(input.eventType || "message").toLowerCase();
+    isHelpfulReply = Boolean(input.isHelpfulReply);
   }
 
   if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
     return { updated: false, completed: false, quest: activeQuest, progress: userState.activeQuestProgress };
+  }
+
+  const goalType = String(activeQuest.goalType || "messages");
+
+  if (goalType === "messages" && eventType !== "message") {
+    return { updated: false, completed: false, quest: activeQuest, progress: userState.activeQuestProgress };
+  }
+
+  if (goalType === "reactions" && eventType !== "reaction") {
+    return { updated: false, completed: false, quest: activeQuest, progress: userState.activeQuestProgress };
+  }
+
+  if (goalType === "commands_used" && eventType !== "command") {
+    return { updated: false, completed: false, quest: activeQuest, progress: userState.activeQuestProgress };
+  }
+
+  if (goalType === "helpful_replies") {
+    if (eventType !== "message" || !isHelpfulReply) {
+      return { updated: false, completed: false, quest: activeQuest, progress: userState.activeQuestProgress };
+    }
+  }
+
+  if (goalType === "streak_days") {
+    const currentDay = getUtcDayKey(now);
+    const lastDay = userState.activeQuestLastProgressAt ? getUtcDayKey(userState.activeQuestLastProgressAt) : null;
+    if (lastDay === currentDay) {
+      return {
+        updated: false,
+        completed: false,
+        quest: activeQuest,
+        progress: userState.activeQuestProgress,
+        reason: "streak_already_counted_today",
+      };
+    }
+
+    userState.activeQuestLastProgressAt = now;
+    userState.activeQuestProgress = Number(userState.activeQuestProgress) + 1;
+    saveStore();
+
+    const completion = completeQuestIfReady(guildId, userId, now);
+    return {
+      updated: true,
+      completed: completion.completed,
+      quest: activeQuest,
+      progress: completion.completed ? 0 : userState.activeQuestProgress,
+      rewardXp: completion.rewardXp || 0,
+      rewardCoins: completion.rewardCoins || 0,
+      previousLevel: completion.previousLevel || null,
+      newLevel: completion.newLevel || null,
+      leveledUp: Boolean(completion.leveledUp),
+      questXp: completion.questXp || userState.questXp,
+      questCoins: completion.questCoins || userState.questCoins,
+    };
+  }
+
+  if (goalType !== "messages" && goalType !== "helpful_replies") {
+    userState.activeQuestProgress = Number(userState.activeQuestProgress) + safeAmount;
+    saveStore();
+
+    const completion = completeQuestIfReady(guildId, userId, now);
+    return {
+      updated: true,
+      completed: completion.completed,
+      quest: activeQuest,
+      progress: completion.completed ? 0 : userState.activeQuestProgress,
+      rewardXp: completion.rewardXp || 0,
+      rewardCoins: completion.rewardCoins || 0,
+      previousLevel: completion.previousLevel || null,
+      newLevel: completion.newLevel || null,
+      leveledUp: Boolean(completion.leveledUp),
+      questXp: completion.questXp || userState.questXp,
+      questCoins: completion.questCoins || userState.questCoins,
+    };
   }
 
   if (activeQuest.chatMode === "echo_phrase") {
@@ -755,10 +710,12 @@ const addQuestProgress = (guildId, userId, input = 1, now = Date.now()) => {
     quest: activeQuest,
     progress: completion.completed ? 0 : userState.activeQuestProgress,
     rewardXp: completion.rewardXp || 0,
+    rewardCoins: completion.rewardCoins || 0,
     previousLevel: completion.previousLevel || null,
     newLevel: completion.newLevel || null,
     leveledUp: Boolean(completion.leveledUp),
     questXp: completion.questXp || userState.questXp,
+    questCoins: completion.questCoins || userState.questCoins,
   };
 };
 
@@ -794,10 +751,12 @@ const stopVoiceQuestTimer = (guildId, userId, now = Date.now()) => {
     quest: activeQuest,
     progress: completion.completed ? 0 : userState.activeQuestProgress,
     rewardXp: completion.rewardXp || 0,
+    rewardCoins: completion.rewardCoins || 0,
     previousLevel: completion.previousLevel || null,
     newLevel: completion.newLevel || null,
     leveledUp: Boolean(completion.leveledUp),
     questXp: completion.questXp || userState.questXp,
+    questCoins: completion.questCoins || userState.questCoins,
   };
 };
 
@@ -828,21 +787,27 @@ const tickVoiceQuestProgress = (guildId, userId, now = Date.now()) => {
     quest: activeQuest,
     progress: completion.completed ? 0 : userState.activeQuestProgress,
     rewardXp: completion.rewardXp || 0,
+    rewardCoins: completion.rewardCoins || 0,
     previousLevel: completion.previousLevel || null,
     newLevel: completion.newLevel || null,
     leveledUp: Boolean(completion.leveledUp),
     questXp: completion.questXp || userState.questXp,
+    questCoins: completion.questCoins || userState.questCoins,
   };
 };
 
 const formatQuestProgress = (quest, progress) => {
   const current = quest.kind === "voice" ? Number(progress || 0).toFixed(1) : Math.floor(Number(progress || 0));
   const target = quest.kind === "voice" ? Number(quest.target).toFixed(1) : Math.floor(Number(quest.target));
-  const label = quest.unit === "minutes" ? "minutes" : "messages";
+  const label = String(quest.unit || "messages");
   return `${current}/${target} ${label}`;
 };
 
-const formatQuestReward = (quest) => `${Number(quest.rewardXp || 0)} XP`;
+const formatQuestReward = (quest) => {
+  const xp = Number(quest.rewardXp || 0);
+  const coins = Number(quest.rewardCoins || 0);
+  return `+${xp} XP • +${coins} coins`;
+};
 
 const formatQuestLevel = (questXp) => {
   const xp = getQuestXpProgress(questXp);
@@ -881,6 +846,7 @@ const buildQuestBoardPayload = (guildId, userId = null, now = Date.now()) => {
       value: [
         `Level **${profileXp.level}**`,
         `XP: **${profileXp.questXp}**`,
+        `Coins: **${Number(userState.questCoins || 0)}**`,
         `Completed: **${Number(userState.completedCount || 0)}**`,
         activeQuest ? `Active: **${activeQuest.title}** (${formatQuestProgress(activeQuest, userState.activeQuestProgress)})` : "Active: **None**",
         getTrashCooldownRemainingMs(guildId, userId, now) > 0
@@ -893,7 +859,7 @@ const buildQuestBoardPayload = (guildId, userId = null, now = Date.now()) => {
   for (const [index, quest] of quests.entries()) {
     embed.addFields({
       name: `${index + 1}. ${quest.icon} ${quest.title}`,
-      value: `${quest.description}\nTarget: **${quest.target} ${quest.unit}**\nReward: **${formatQuestReward(quest)}**`,
+      value: `${quest.description}\nType: **${quest.goalType}** • Difficulty: **${quest.difficulty}**\nTarget: **${quest.target} ${quest.unit}**\nReward: **${formatQuestReward(quest)}**`,
     });
   }
 
@@ -933,6 +899,7 @@ const buildQuestStatsPayload = (guildId, userId, now = Date.now()) => {
     .addFields(
       { name: "Level", value: `**${xp.level}**`, inline: true },
       { name: "Quest XP", value: `**${xp.questXp}**`, inline: true },
+      { name: "Coins", value: `**${Number(userState.questCoins || 0)}**`, inline: true },
       { name: "To Next Level", value: `**${xp.xpToNextLevel} XP**`, inline: true },
       { name: "Completed Quests", value: `**${Number(userState.completedCount || 0)}**`, inline: true },
       { name: "Quest History Entries", value: `**${Array.isArray(userState.questHistory) ? userState.questHistory.length : 0}**`, inline: true },
@@ -958,7 +925,7 @@ const buildQuestHistoryPayload = (guildId, userId, limit = 5, now = Date.now()) 
         name: `${index + 1}. ${entry.title}`,
         value: [
           `Completed: <t:${Math.floor(Number(entry.completedAt || now) / 1000)}:R>`,
-          `Reward: **${Number(entry.rewardXp || 0)} XP**`,
+          `Reward: **+${Number(entry.rewardXp || 0)} XP • +${Number(entry.rewardCoins || 0)} coins**`,
           `Level: **${Number(entry.levelBefore || 1)} → ${Number(entry.levelAfter || 1)}**`,
         ].join("\n"),
       }))
@@ -1009,7 +976,7 @@ const buildQuestLeaderboardPayload = async (guild, limit = 10, now = Date.now())
 };
 
 const formatQuestSummary = (quest) => {
-  const targetLabel = quest.unit === "minutes" ? `${quest.target} minutes` : `${quest.target} messages`;
+  const targetLabel = `${quest.target} ${quest.unit}`;
   return `${quest.icon} **${quest.title}** - ${quest.description} (Target: **${targetLabel}**, Reward: **${formatQuestReward(quest)}**)`;
 };
 
@@ -1035,6 +1002,7 @@ module.exports = {
   getActiveQuests,
   getQuestById,
   getQuestLevel,
+  forceRefreshGuildQuestCycle,
   getUserQuestState,
   loadStore,
   saveStore,
