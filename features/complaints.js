@@ -8,30 +8,182 @@ const {
   ActionRowBuilder,
   ChannelType,
   AttachmentBuilder,
+  StringSelectMenuBuilder,
+  OverwriteType,
 } = require("discord.js");
 
 let registered = false;
+
+const COMPLAINT_CREATE_BUTTON_ID = "create_complaint_channel";
+const COMPLAINT_TYPE_SELECT_PREFIX = "complaint_type_select:";
+
+const COMPLAINT_TYPES = [
+  {
+    value: "vc",
+    label: "Voice Chat",
+    description: "Voice channel behavior or moderation issues",
+  },
+  {
+    value: "chat",
+    label: "Normal Chat",
+    description: "Text channel behavior, spam, or harassment",
+  },
+  {
+    value: "dm",
+    label: "DM Issues",
+    description: "Direct message related issues",
+  },
+  {
+    value: "admin",
+    label: "Admin Level Issues",
+    description: "Critical issues requiring admin-only handling",
+  },
+];
+
+const loadConfig = () => {
+  try {
+    delete require.cache[require.resolve("../config.json")];
+    return require("../config.json");
+  } catch {
+    return {};
+  }
+};
+
+const normalizeIds = (value) => {
+  if (Array.isArray(value)) {
+    return value.map((id) => String(id).trim()).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+  }
+
+  if (value === undefined || value === null) {
+    return [];
+  }
+
+  return [String(value).trim()].filter(Boolean);
+};
+
+const uniqueIds = (...lists) => [...new Set(lists.flat().filter(Boolean))];
+
+const getRuntimeConfig = () => {
+  const cfg = loadConfig();
+
+  return {
+    buttonChannelId:
+      (process.env.COMPLAINT_BUTTON_CHANNEL_ID || cfg.complaintButtonChannelId || "").trim(),
+    displayChannelId:
+      (process.env.COMPLAINT_DISPLAY_CHANNEL_ID || cfg.complaintDisplayChannelId || "").trim(),
+    adminChannelId:
+      (process.env.COMPLAINT_ADMIN_CHANNEL_ID || cfg.complaintAdminChannelId || "").trim(),
+    categoryId:
+      (process.env.COMPLAINT_CATEGORY_ID || cfg.complaintCategoryId || "1473330861406421136").trim(),
+    vcModRoleIds: normalizeIds(
+      process.env.COMPLAINT_VC_MOD_ROLE_IDS || cfg.complaintVcModRoleIds || cfg.complaintVcModRoleId
+    ),
+    chatModRoleIds: normalizeIds(
+      process.env.COMPLAINT_CHAT_MOD_ROLE_IDS || cfg.complaintChatModRoleIds || cfg.complaintChatModRoleId
+    ),
+    headModRoleIds: normalizeIds(
+      process.env.COMPLAINT_HEAD_MOD_ROLE_IDS || cfg.complaintHeadModRoleIds || cfg.complaintHeadModRoleId
+    ),
+    adminRoleIds: normalizeIds(
+      process.env.COMPLAINT_ADMIN_ROLE_IDS || cfg.complaintAdminRoleIds || cfg.complaintAdminRoleId
+    ),
+  };
+};
+
+const getComplaintTypeLabel = (typeValue) => {
+  const found = COMPLAINT_TYPES.find((type) => type.value === String(typeValue || "").trim());
+  return found ? found.label : "Unknown";
+};
+
+const getAdminRolesFromGuild = (guild) => {
+  return guild.roles.cache
+    .filter((role) => role.permissions.has(PermissionsBitField.Flags.Administrator))
+    .map((role) => role.id);
+};
+
+const getAllowedRoleIdsForType = (type, runtimeConfig, guild) => {
+  const typeKey = String(type || "").trim().toLowerCase();
+  const autoAdminRoleIds = guild ? getAdminRolesFromGuild(guild) : [];
+  const configuredAdminRoleIds = uniqueIds(runtimeConfig.adminRoleIds, autoAdminRoleIds);
+
+  if (typeKey === "vc") {
+    return uniqueIds(runtimeConfig.vcModRoleIds, runtimeConfig.headModRoleIds, configuredAdminRoleIds);
+  }
+
+  if (typeKey === "chat") {
+    return uniqueIds(runtimeConfig.chatModRoleIds, runtimeConfig.headModRoleIds, configuredAdminRoleIds);
+  }
+
+  if (typeKey === "dm") {
+    return uniqueIds(runtimeConfig.headModRoleIds, configuredAdminRoleIds);
+  }
+
+  if (typeKey === "admin") {
+    return configuredAdminRoleIds;
+  }
+
+  return configuredAdminRoleIds;
+};
+
+const buildComplaintTypeSelectRow = (requesterId) => {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId(`${COMPLAINT_TYPE_SELECT_PREFIX}${requesterId}`)
+      .setPlaceholder("Select complaint type")
+      .addOptions(COMPLAINT_TYPES)
+  );
+};
+
+const getComplaintMetaFromTopic = (topic) => {
+  const parts = String(topic || "")
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  const meta = {
+    ownerId: null,
+    type: "admin",
+  };
+
+  for (const part of parts) {
+    const [keyRaw, ...rest] = part.split(":");
+    const key = String(keyRaw || "").trim();
+    const value = rest.join(":").trim();
+    if (!key || !value) continue;
+
+    if (key === "complaint-owner") meta.ownerId = value;
+    if (key === "complaint-type") meta.type = value;
+  }
+
+  return meta;
+};
+
+const roleMentionsFromIds = (guild, roleIds) => {
+  const mentions = roleIds
+    .map((roleId) => guild.roles.cache.get(roleId))
+    .filter(Boolean)
+    .map((role) => `<@&${role.id}>`);
+
+  return mentions.length > 0 ? mentions.join(" ") : "Configured staff roles";
+};
 
 const complaints = () => {
   if (registered) return;
   registered = true;
 
-  const cfgPath = path.join(__dirname, "..", "config.json");
-  let cfg = {};
-  try {
-    cfg = require(cfgPath);
-  } catch {}
-
-  const buttonChannelId =
-    process.env.COMPLAINT_BUTTON_CHANNEL_ID || cfg.complaintButtonChannelId;
-  const displayChannelId =
-    process.env.COMPLAINT_DISPLAY_CHANNEL_ID || cfg.complaintDisplayChannelId;
-  const adminChannelId =
-    process.env.COMPLAINT_ADMIN_CHANNEL_ID || cfg.complaintAdminChannelId;
-
   // Send button message when bot starts
   client.on("clientReady", async () => {
     try {
+      const runtimeConfig = getRuntimeConfig();
+      const { buttonChannelId } = runtimeConfig;
+
       if (!buttonChannelId) {
         console.warn("complaints: button channel ID not configured");
         return;
@@ -53,7 +205,7 @@ const complaints = () => {
         .setColor("#FF6B6B");
 
       const button = new ButtonBuilder()
-        .setCustomId("create_complaint_channel")
+        .setCustomId(COMPLAINT_CREATE_BUTTON_ID)
         .setLabel("File Complaint")
         .setStyle(ButtonStyle.Danger);
 
@@ -67,7 +219,7 @@ const complaints = () => {
         (m) =>
           m.author.id === client.user.id &&
           m.components.some((c) =>
-            c.components.some((btn) => btn.customId === "create_complaint_channel")
+            c.components.some((btn) => btn.customId === COMPLAINT_CREATE_BUTTON_ID)
           )
       );
 
@@ -81,60 +233,110 @@ const complaints = () => {
 
   // Handle complaint button click
   client.on("interactionCreate", async (interaction) => {
-    if (!interaction.isButton()) return;
-    if (interaction.customId !== "create_complaint_channel") return;
+    if (interaction.isButton() && interaction.customId === COMPLAINT_CREATE_BUTTON_ID) {
+      await interaction.reply({
+        ephemeral: true,
+        content: "Choose the type of complaint you want to file:",
+        components: [buildComplaintTypeSelectRow(interaction.user.id)],
+      }).catch(() => {});
+      return;
+    }
+
+    if (!interaction.isStringSelectMenu()) return;
+    if (!interaction.customId.startsWith(COMPLAINT_TYPE_SELECT_PREFIX)) return;
 
     try {
       const guild = interaction.guild;
       const user = interaction.user;
+      const runtimeConfig = getRuntimeConfig();
+      const requestedById = interaction.customId.replace(COMPLAINT_TYPE_SELECT_PREFIX, "");
+
+      if (requestedById !== user.id) {
+        await interaction.reply({
+          ephemeral: true,
+          content: "This complaint menu is not for you.",
+        }).catch(() => {});
+        return;
+      }
+
+      const selectedType = interaction.values?.[0];
+      const selectedTypeLabel = getComplaintTypeLabel(selectedType);
+      const allowedRoleIds = getAllowedRoleIdsForType(selectedType, runtimeConfig, guild);
+
+      if (!runtimeConfig.categoryId) {
+        await interaction.reply({
+          ephemeral: true,
+          content: "Complaint category is not configured. Ask an admin to set complaintCategoryId.",
+        }).catch(() => {});
+        return;
+      }
+
+      const category = guild.channels.cache.get(runtimeConfig.categoryId);
+      if (!category || category.type !== ChannelType.GuildCategory) {
+        await interaction.reply({
+          ephemeral: true,
+          content: "Configured complaint category is invalid. Ask an admin to verify complaintCategoryId.",
+        }).catch(() => {});
+        return;
+      }
 
       await interaction.deferReply({ ephemeral: true });
 
-      // Get admin role (or create channel visible to bot and user)
-      const channel = await guild.channels.create({
-        name: `complaint-${user.username}`,
-        type: ChannelType.GuildText,
-        topic: `Complaint ticket for ${user.tag}`,
-        parent: "1473330861406421136",
-        permissionOverwrites: [
-          {
-            id: guild.id,
-            deny: [PermissionsBitField.Flags.ViewChannel],
-          },
-          {
-            id: user.id,
-            allow: [
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.SendMessages,
-              PermissionsBitField.Flags.ReadMessageHistory,
-            ],
-          },
-          {
-            id: client.user.id,
-            allow: [
-              PermissionsBitField.Flags.ViewChannel,
-              PermissionsBitField.Flags.SendMessages,
-              PermissionsBitField.Flags.ReadMessageHistory,
-              PermissionsBitField.Flags.ManageChannels,
-            ],
-          },
-        ],
-      });
+      const permissionOverwrites = [
+        {
+          id: guild.id,
+          type: OverwriteType.Role,
+          deny: [PermissionsBitField.Flags.ViewChannel],
+        },
+        {
+          id: user.id,
+          type: OverwriteType.Member,
+          allow: [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+            PermissionsBitField.Flags.ReadMessageHistory,
+            PermissionsBitField.Flags.AttachFiles,
+            PermissionsBitField.Flags.EmbedLinks,
+          ],
+        },
+        {
+          id: client.user.id,
+          type: OverwriteType.Member,
+          allow: [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+            PermissionsBitField.Flags.ReadMessageHistory,
+            PermissionsBitField.Flags.ManageChannels,
+            PermissionsBitField.Flags.ManageMessages,
+          ],
+        },
+      ];
 
-      // Allow admins to see the channel
-      const adminRole = guild.roles.cache.find((r) => r.permissions.has(PermissionsBitField.Flags.Administrator));
-      if (adminRole) {
-        await channel.permissionOverwrites.edit(adminRole, {
-          ViewChannel: true,
-          SendMessages: true,
-          ReadMessageHistory: true,
+      for (const roleId of allowedRoleIds) {
+        permissionOverwrites.push({
+          id: roleId,
+          type: OverwriteType.Role,
+          allow: [
+            PermissionsBitField.Flags.ViewChannel,
+            PermissionsBitField.Flags.SendMessages,
+            PermissionsBitField.Flags.ReadMessageHistory,
+          ],
         });
       }
+
+      const channel = await guild.channels.create({
+        name: `complaint-${selectedType}-${user.username}`,
+        type: ChannelType.GuildText,
+        topic: `complaint-owner:${user.id} | complaint-type:${selectedType} | user-tag:${user.tag}`,
+        parent: category.id,
+        permissionOverwrites,
+        reason: `Complaint (${selectedType}) opened by ${user.tag} (${user.id})`,
+      });
 
       const instructionEmbed = new EmbedBuilder()
         .setTitle("✅ Complaint Ticket Created")
         .setDescription(
-          `Your complaint channel has been created at ${channel}. Please describe your complaint in detail below.`
+          `Your complaint channel has been created at ${channel}.\nType selected: **${selectedTypeLabel}**\n\nPlease describe your complaint in detail below.`
         )
         .setColor("#FF6B6B");
 
@@ -145,16 +347,20 @@ const complaints = () => {
       const welcomeEmbed = new EmbedBuilder()
         .setTitle("📋 Complaint Ticket")
         .setDescription(
-          `Welcome to your complaint ticket, ${user.tag}.\n\nPlease describe your complaint in detail. Admins will review your complaint and get back to you.`
+          `Welcome to your complaint ticket, ${user.tag}.\n\nComplaint type: **${selectedTypeLabel}**\nPlease describe your complaint in detail. The assigned staff team will review it and get back to you.`
         )
         .setColor("#FF6B6B")
         .setTimestamp();
 
       await channel.send({ embeds: [welcomeEmbed] });
 
+      await channel.send({
+        content: `Assigned staff: ${roleMentionsFromIds(guild, allowedRoleIds)}`,
+      }).catch(() => {});
+
       // Post complaint to display channel
       const displayChannel = await client.channels
-        .fetch(displayChannelId)
+        .fetch(runtimeConfig.displayChannelId)
         .catch(() => null);
 
       if (displayChannel) {
@@ -163,11 +369,17 @@ const complaints = () => {
           .setColor("#FF6B6B")
           .addFields(
             { name: "User", value: `${user.tag} (${user.id})`, inline: true },
+            { name: "Type", value: selectedTypeLabel, inline: true },
             { name: "Ticket Channel", value: `${channel}`, inline: true },
             {
               name: "Status",
               value: "🔴 Open",
               inline: true,
+            },
+            {
+              name: "Assigned Staff",
+              value: roleMentionsFromIds(guild, allowedRoleIds),
+              inline: false,
             }
           )
           .setTimestamp();
@@ -185,7 +397,7 @@ const complaints = () => {
 
       // Add admin instructions
       const adminMsg = await channel.send({
-        content: "**Admins:** Click the button below when the complaint is resolved.",
+        content: "**Assigned staff:** Click the button below when the complaint is resolved.",
         components: [solveRow],
       });
 
@@ -211,18 +423,10 @@ const complaints = () => {
     if (!interaction.customId.startsWith("solve_complaint_")) return;
 
     try {
-      // Check if user has admin permissions
-      if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
-        await interaction.reply({
-          content: "❌ Only admins can resolve complaints.",
-          ephemeral: true,
-        });
-        return;
-      }
+      const runtimeConfig = getRuntimeConfig();
 
       await interaction.deferReply({ ephemeral: true });
 
-      // Extract channelId and userId from customId: solve_complaint_{channelId}_{userId}
       const parts = interaction.customId.split("_");
       const channelId = parts[2]; // Index 2 because: 0=solve, 1=complaint, 2=channelId, 3=userId
       const userId = parts[3];
@@ -242,6 +446,19 @@ const complaints = () => {
       if (!complaintChannel) {
         await interaction.editReply({
           content: "❌ Complaint channel not found.",
+        });
+        return;
+      }
+
+      const complaintMeta = getComplaintMetaFromTopic(complaintChannel.topic);
+      const allowedRoleIds = getAllowedRoleIdsForType(complaintMeta.type, runtimeConfig, interaction.guild);
+
+      const isAdminPermission = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
+      const hasAllowedRole = allowedRoleIds.some((roleId) => interaction.member.roles.cache.has(roleId));
+
+      if (!isAdminPermission && !hasAllowedRole) {
+        await interaction.editReply({
+          content: "❌ You are not allowed to resolve this complaint.",
         });
         return;
       }
@@ -345,7 +562,7 @@ const complaints = () => {
 
       // Send to admin channel
       const adminChannel = await client.channels
-        .fetch(adminChannelId)
+        .fetch(runtimeConfig.adminChannelId)
         .catch(() => null);
 
       if (adminChannel) {
@@ -374,7 +591,7 @@ const complaints = () => {
 
       // Update complaint display channel
       const displayChannel = await client.channels
-        .fetch(displayChannelId)
+        .fetch(runtimeConfig.displayChannelId)
         .catch(() => null);
 
       if (displayChannel) {
