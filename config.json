@@ -39,6 +39,10 @@
   "aiReplyChannelIds": [
     "1488558127736426527"
   ],
+  "attachmentOnlyChannelIds": [
+    "1493694673443749949",
+    "947113907036766208"
+  ],
   "chatRevivalRoleId": "1441084599882088488",
   "vcRevivalRoleId": "1441084639295967444",
   "privateVcDefaultLimit": 5,
