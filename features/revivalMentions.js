@@ -5,8 +5,8 @@ const { PermissionFlagsBits } = require("discord.js");
 
 const CHAT_REVIVAL_NAME = "chat revival";
 const VC_REVIVAL_NAME = "vc revival";
-const CHAT_TRIGGER_REGEX = /^chat\s+revival$/i;
-const VC_TRIGGER_REGEX = /^vc\s+revival$/i;
+const CHAT_TRIGGER_REGEX = /^(?:chat\s+revival|arise\s+chat)$/i;
+const VC_TRIGGER_REGEX = /^(?:vc\s+revival|arise\s+vc)$/i;
 
 const CHAT_REVIVAL_ROLE_ID = String(
   process.env.CHAT_REVIVAL_ROLE_ID || config.chatRevivalRoleId || ""
