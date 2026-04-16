@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
+﻿const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
 const { forceRefreshGuildQuestCycle } = require("../utils/questStore");
 
 module.exports = {
@@ -14,14 +14,14 @@ module.exports = {
 
   async execute(interaction) {
     if (!interaction.guild) {
-      return interaction.reply({ content: "This command can only be used in a server.", ephemeral: true });
+      return interaction.reply({ content: "This command can only be used in a server.", flags: 64 });
     }
 
     try {
       const action = interaction.options.getSubcommand();
 
       if (action !== "refresh") {
-        return interaction.reply({ content: "Unknown quest admin action.", ephemeral: true });
+        return interaction.reply({ content: "Unknown quest admin action.", flags: 64 });
       }
 
       const result = forceRefreshGuildQuestCycle(interaction.guild.id, Date.now());
@@ -33,20 +33,21 @@ module.exports = {
           `Users affected: **${Number(result.usersAffected || 0)}**`,
           `Next auto refresh: <t:${nextRefreshUnix}:R>`,
         ].join("\n"),
-        ephemeral: true,
+        flags: 64,
       });
     } catch (error) {
       console.error("questadmin command error:", error);
       if (interaction.deferred || interaction.replied) {
         return interaction.followUp({
           content: "There was an error while force-refreshing quests.",
-          ephemeral: true,
+          flags: 64,
         }).catch(() => {});
       }
       return interaction.reply({
         content: "There was an error while force-refreshing quests.",
-        ephemeral: true,
+        flags: 64,
       }).catch(() => {});
     }
   },
 };
+

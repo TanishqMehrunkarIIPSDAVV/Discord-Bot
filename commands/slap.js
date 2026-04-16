@@ -1,4 +1,4 @@
-const { SlashCommandBuilder,channelMention,userMention,roleMention} = require('discord.js');
+﻿const { SlashCommandBuilder,channelMention,userMention,roleMention} = require('discord.js');
 
 var arr=[
 "https://giphy.com/gifs/kid-hit-smack-XDRoTw2Fs6rlIW7yQL",
@@ -20,6 +20,7 @@ module.exports = {
 		const member = interaction.options.getMember('target');
     if(!member) return;
     const u=userMention(member.id);
-		return interaction.reply({ content: `You slapped`+` `+u,embeds:[exampleEmbed], ephemeral: false });
+		return interaction.reply({ content: `You slapped`+` `+u,embeds:[exampleEmbed], flags: 0 });
 	},
 };
+

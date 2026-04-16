@@ -128,7 +128,7 @@ module.exports = {
       if (!member.voice.channel) {
         return await interaction.reply({
           content: '❌ You must be in a voice channel to use this command!',
-          ephemeral: true
+          flags: 64
         });
       }
 
@@ -181,7 +181,7 @@ module.exports = {
 
       return await interaction.reply({
         content: `✅ You will be removed from **${voiceChannel.name}** in **${minutes}** minute${minutes > 1 ? 's' : ''} at <t:${removalTimestamp}:t> (<t:${removalTimestamp}:R>).\n\n*You can run this command again to reschedule or leave the voice channel to cancel.*`,
-        ephemeral: true
+        flags: 64
       });
 
     } catch (err) {
@@ -190,7 +190,7 @@ module.exports = {
         if (interaction.deferred || interaction.replied) {
           await interaction.editReply({ content: 'There was an error executing this command.' });
         } else {
-          await interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
+          await interaction.reply({ content: 'There was an error executing this command.', flags: 64 });
         }
       } catch (e) {
         console.error('removeme error reply failed:', e);
@@ -199,3 +199,4 @@ module.exports = {
   },
   initializeTimers
 };
+

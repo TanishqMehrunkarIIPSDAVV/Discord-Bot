@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, userMention } = require("discord.js");
+﻿const { SlashCommandBuilder, EmbedBuilder, userMention } = require("discord.js");
 const { getLeaderboard, getCurrentMilestone } = require("../utils/vcPointsStore");
 
 const formatPoints = (value) => Number(value || 0).toFixed(2);
@@ -23,7 +23,7 @@ module.exports = {
     if (!rows.length) {
       return interaction.reply({
         content: "No VC points have been recorded in this server yet.",
-        ephemeral: true,
+        flags: 64,
       });
     }
 
@@ -46,3 +46,4 @@ module.exports = {
     return interaction.reply({ embeds: [embed] });
   },
 };
+

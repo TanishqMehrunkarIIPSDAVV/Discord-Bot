@@ -30,7 +30,8 @@ module.exports = {
       content: `${userMention(target.id)} has **${formatPoints(stats.points)}** VC points (tracked time: **${formatHours(
         stats.trackedHours
       )} hours**)${milestoneText}${progressText}`,
-      ephemeral: false,
+      flags: 0,
     });
   },
 };
+

@@ -339,40 +339,40 @@ const quest = () => {
     if (interaction.isButton()) {
       if (interaction.customId === QUEST_TRASH_BUTTON_ID) {
         if (!interaction.guild) {
-          return interaction.reply({ content: "Quests only work in servers.", ephemeral: true }).catch(() => {});
+          return interaction.reply({ content: "Quests only work in servers.", flags: 64 }).catch(() => {});
         }
 
         if (isQuestBlockedChannel(interaction.channel)) {
-          return interaction.reply({ content: QUEST_BLOCKED_MESSAGE, ephemeral: true }).catch(() => {});
+          return interaction.reply({ content: QUEST_BLOCKED_MESSAGE, flags: 64 }).catch(() => {});
         }
 
         const result = trashActiveQuest(interaction.guild.id, interaction.user.id);
         if (!result.ok) {
-          return interaction.reply({ content: result.reason || "No active quest to trash.", ephemeral: true }).catch(() => {});
+          return interaction.reply({ content: result.reason || "No active quest to trash.", flags: 64 }).catch(() => {});
         }
 
         const cooldownSeconds = Math.ceil(Number(result.cooldownMs || 0) / 1000);
         return interaction.reply({
           content: `🗑️ You trashed **${result.quest.title}**. Accepting a new quest unlocks in **${cooldownSeconds}s**.`,
-          ephemeral: true,
+          flags: 64,
         }).catch(() => {});
       }
 
       if (!interaction.customId.startsWith(QUEST_PANEL_BUTTON_PREFIX)) return;
 
       if (!interaction.guild) {
-        return interaction.reply({ content: "Quests only work in servers.", ephemeral: true }).catch(() => {});
+        return interaction.reply({ content: "Quests only work in servers.", flags: 64 }).catch(() => {});
       }
 
       if (isQuestBlockedChannel(interaction.channel)) {
-        return interaction.reply({ content: QUEST_BLOCKED_MESSAGE, ephemeral: true }).catch(() => {});
+        return interaction.reply({ content: QUEST_BLOCKED_MESSAGE, flags: 64 }).catch(() => {});
       }
 
       const questId = interaction.customId.slice(QUEST_PANEL_BUTTON_PREFIX.length);
       const result = acceptQuest(interaction.guild.id, interaction.user.id, questId);
 
       if (!result.ok) {
-        return interaction.reply({ content: result.reason || "That quest is unavailable.", ephemeral: true }).catch(() => {});
+        return interaction.reply({ content: result.reason || "That quest is unavailable.", flags: 64 }).catch(() => {});
       }
 
       const activeQuest = result.quest;
@@ -395,7 +395,7 @@ const quest = () => {
         confirmation.setFooter({ text: "Your VC timer started because you were already in voice chat." });
       }
 
-      return interaction.reply({ embeds: [confirmation], ephemeral: true }).catch(() => {});
+      return interaction.reply({ embeds: [confirmation], flags: 64 }).catch(() => {});
     }
   });
 

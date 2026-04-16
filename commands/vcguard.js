@@ -1,4 +1,4 @@
-const fs = require("node:fs");
+﻿const fs = require("node:fs");
 const path = require("node:path");
 const { SlashCommandBuilder, PermissionFlagsBits } = require("discord.js");
 
@@ -53,7 +53,7 @@ module.exports = {
           : 0;
         return interaction.reply({
           content: `VC guard is currently **${enabled ? "ENABLED" : "DISABLED"}**. Blocked users configured: **${blockedCount}**.`,
-          ephemeral: true,
+          flags: 64,
         });
       }
 
@@ -61,7 +61,7 @@ module.exports = {
       if (enabled === nextEnabled) {
         return interaction.reply({
           content: `VC guard is already **${enabled ? "ENABLED" : "DISABLED"}**.`,
-          ephemeral: true,
+          flags: 64,
         });
       }
 
@@ -71,20 +71,21 @@ module.exports = {
 
       return interaction.reply({
         content: `VC guard is now **${nextEnabled ? "ENABLED" : "DISABLED"}**.`,
-        ephemeral: true,
+        flags: 64,
       });
     } catch (err) {
       console.error("vcguard command error:", err);
       if (interaction.deferred || interaction.replied) {
         return interaction.followUp({
           content: "There was an error while updating VC guard settings.",
-          ephemeral: true,
+          flags: 64,
         }).catch(() => {});
       }
       return interaction.reply({
         content: "There was an error while updating VC guard settings.",
-        ephemeral: true,
+        flags: 64,
       }).catch(() => {});
     }
   },
 };
+

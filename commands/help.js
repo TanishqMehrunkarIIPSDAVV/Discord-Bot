@@ -1,4 +1,4 @@
-const path = require('node:path');
+﻿const path = require('node:path');
 const { SlashCommandBuilder } = require('discord.js');
 const { getHelpPages, getHelpRow } = require("../utils/helpContent");
 
@@ -15,7 +15,7 @@ module.exports = {
             embeds: [helpPages[page]],
             components: [getHelpRow(page, totalPages)],
             files: [{ attachment: thumbnailPath, name: 'thumbnail.jpg' }],
-            ephemeral: true
+            flags: 64
         });
 
         const msg = await interaction.fetchReply();
@@ -23,7 +23,7 @@ module.exports = {
 
         collector.on("collect", async (i) => {
             if (i.user.id !== interaction.user.id) {
-                return i.reply({ content: "Only you can use these buttons for your help menu.", ephemeral: true });
+                return i.reply({ content: "Only you can use these buttons for your help menu.", flags: 64 });
             }
             if (i.customId === "next" && page < helpPages.length - 1) page++;
             if (i.customId === "prev" && page > 0) page--;

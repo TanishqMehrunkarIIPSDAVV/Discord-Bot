@@ -80,6 +80,7 @@ const getHelpPages = () => {
             `• </punch:> Punch a user\n` +
             `• </slap:> Slap a user\n` +
             `• </lore:> Summarize tracked chat history and explain what happened\n` +
+            `• </ratings:> View a user's peer rating summary\n` +
             `• </test:> Testing command\n\n` +
             `🔊 **Voice & Moderation**\n` +
             `• </removeme:> Schedule VC removal\n` +

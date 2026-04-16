@@ -1,4 +1,4 @@
-const path = require("node:path");
+﻿const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const {
     ActionRowBuilder,
@@ -124,7 +124,7 @@ const girlModApplication = () => {
             if (!REVIEWER_USER_ID || REVIEWER_USER_ID === "PUT_USER_ID_HERE") {
                 await interaction.reply({
                     content: "Application submitted, but reviewer ID is not configured yet. Ask admin to set `GIRL_MOD_REVIEWER_ID` or edit the feature file.",
-                    ephemeral: true,
+                    flags: 64,
                 });
                 return;
             }
@@ -143,13 +143,13 @@ const girlModApplication = () => {
 
                 await interaction.reply({
                     content: "Your application has been submitted successfully.",
-                    ephemeral: true,
+                    flags: 64,
                 });
             } catch (error) {
                 console.error("Failed to send application DM:", error);
                 await interaction.reply({
                     content: "Could not submit your application right now. Please try again later.",
-                    ephemeral: true,
+                    flags: 64,
                 });
             }
         }
@@ -157,3 +157,4 @@ const girlModApplication = () => {
 };
 
 module.exports = girlModApplication;
+

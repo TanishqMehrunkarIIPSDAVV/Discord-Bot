@@ -35,11 +35,11 @@ module.exports = {
     ),
   async execute(interaction) {
     if (!interaction.guild) {
-      return interaction.reply({ content: "Quests only work in servers.", ephemeral: true });
+      return interaction.reply({ content: "Quests only work in servers.", flags: 64 });
     }
 
     if (isQuestBlockedChannel(interaction.channel)) {
-      return interaction.reply({ content: QUEST_BLOCKED_MESSAGE, ephemeral: true });
+      return interaction.reply({ content: QUEST_BLOCKED_MESSAGE, flags: 64 });
     }
 
     const view = (interaction.options.getString("view") || "board").toLowerCase();
@@ -55,12 +55,12 @@ module.exports = {
     } else if (view === "trash") {
       const result = trashActiveQuest(interaction.guild.id, interaction.user.id);
       if (!result.ok) {
-        payload = { content: result.reason || "No active quest to trash.", ephemeral: true };
+        payload = { content: result.reason || "No active quest to trash.", flags: 64 };
       } else {
         const cooldownSeconds = Math.ceil(Number(result.cooldownMs || 0) / 1000);
         payload = {
           content: `🗑️ You trashed **${result.quest.title}**. You can accept a new quest in **${cooldownSeconds}s**.`,
-          ephemeral: true,
+          flags: 64,
         };
       }
     } else {

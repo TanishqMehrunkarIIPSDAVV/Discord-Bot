@@ -1,4 +1,4 @@
-const path=require("node:path");
+﻿const path=require("node:path");
 const client=require(`${path.dirname(__dirname)}/index.js`);
 const {Events} = require("discord.js");
 
@@ -21,11 +21,11 @@ const interactionFunc=()=>
             console.error(error);
             if (interaction.replied || interaction.deferred)
             {
-                await interaction.followUp({ content: 'There was an error while executing this command!', ephemeral: true });
+                await interaction.followUp({ content: 'There was an error while executing this command!', flags: 64 });
             } 
             else
             {
-                await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+                await interaction.reply({ content: 'There was an error while executing this command!', flags: 64 });
             }
         }
     });

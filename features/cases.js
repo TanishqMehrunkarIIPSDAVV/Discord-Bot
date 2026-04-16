@@ -187,7 +187,7 @@ const cases = () => {
       const collector = sent.createMessageComponentCollector({ time: 120000 });
       collector.on("collect", async (interaction) => {
         if (interaction.user.id !== message.author.id) {
-          return interaction.reply({ content: "Only you can use these buttons.", ephemeral: true });
+          return interaction.reply({ content: "Only you can use these buttons.", flags: 64 });
         }
 
         if (interaction.customId === "cases_close") {

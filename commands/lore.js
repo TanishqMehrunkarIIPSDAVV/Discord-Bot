@@ -52,7 +52,7 @@ module.exports = {
         await ensureHistoryLoaded();
 
         if (!interaction.guild) {
-            return interaction.reply({ content: "This command only works inside a server.", ephemeral: true });
+            return interaction.reply({ content: "This command only works inside a server.", flags: 64 });
         }
 
         const userOption = interaction.options.getUser("user");
@@ -107,7 +107,7 @@ module.exports = {
         if (!segments.length) {
             return interaction.reply({
                 content: `I do not have enough tracked lore yet for ${scopeLabel}. Try again after there has been more chat activity in a tracked channel.`,
-                ephemeral: true,
+                flags: 64,
             });
         }
 
@@ -158,6 +158,6 @@ module.exports = {
             )
             .setFooter({ text: `Based on ${segments.length} tracked segment${segments.length === 1 ? "" : "s"}.` });
 
-        return interaction.reply({ embeds: [embed], ephemeral: true });
+        return interaction.reply({ embeds: [embed], flags: 64 });
     },
 };

@@ -469,14 +469,14 @@ const tickets = () => {
     if (interaction.customId === TICKET_CREATE_BUTTON_ID) {
       const runtimeConfig = getRuntimeConfig();
       if (!interaction.guild) {
-        await interaction.reply({ content: "Tickets are only available in servers.", ephemeral: true }).catch(() => {});
+        await interaction.reply({ content: "Tickets are only available in servers.", flags: 64 }).catch(() => {});
         return;
       }
 
       if (!runtimeConfig.categoryId) {
         await interaction.reply({
           content: "Ticket category is not configured yet. Ask an admin to set ticketCategoryId.",
-          ephemeral: true,
+          flags: 64,
         }).catch(() => {});
         return;
       }
@@ -484,14 +484,14 @@ const tickets = () => {
       await interaction.reply({
         content: "Select the type of ticket you want to open:",
         components: [buildTicketTypeSelectRow(interaction.user.id)],
-        ephemeral: true,
+        flags: 64,
       }).catch(() => {});
       return;
     }
 
     if (interaction.customId === TICKET_CLOSE_BUTTON_ID) {
       if (!interaction.guild || !interaction.channel || interaction.channel.type !== ChannelType.GuildText) {
-        await interaction.reply({ content: "This action can only be used inside a server text channel.", ephemeral: true }).catch(() => {});
+        await interaction.reply({ content: "This action can only be used inside a server text channel.", flags: 64 }).catch(() => {});
         return;
       }
 
@@ -507,11 +507,11 @@ const tickets = () => {
       const isAdmin = interaction.member.permissions.has(PermissionsBitField.Flags.Administrator);
 
       if (!isTicketOwner && !hasStaffRole && !isAdmin) {
-        await interaction.reply({ content: "Only ticket owner or staff can close this ticket.", ephemeral: true }).catch(() => {});
+        await interaction.reply({ content: "Only ticket owner or staff can close this ticket.", flags: 64 }).catch(() => {});
         return;
       }
 
-      await interaction.reply({ content: "Closing ticket in 5 seconds...", ephemeral: true }).catch(() => {});
+      await interaction.reply({ content: "Closing ticket in 5 seconds...", flags: 64 }).catch(() => {});
 
       await interaction.channel
         .setTopic(String(interaction.channel.topic || "").replace("ticket-status:open", "ticket-status:closed"))
@@ -538,7 +538,7 @@ const tickets = () => {
 
     const requestedByUserId = interaction.customId.slice(TICKET_TYPE_SELECT_PREFIX.length);
     if (interaction.user.id !== requestedByUserId) {
-      await interaction.reply({ content: "This selection is not for you.", ephemeral: true }).catch(() => {});
+      await interaction.reply({ content: "This selection is not for you.", flags: 64 }).catch(() => {});
       return;
     }
 
@@ -566,7 +566,7 @@ const tickets = () => {
     const modalPayload = interaction.customId.slice(TICKET_SUBJECT_MODAL_PREFIX.length);
     const divider = modalPayload.indexOf(":");
     if (divider < 1) {
-      await interaction.reply({ content: "Invalid ticket submission payload.", ephemeral: true }).catch(() => {});
+      await interaction.reply({ content: "Invalid ticket submission payload.", flags: 64 }).catch(() => {});
       return;
     }
 
@@ -574,27 +574,27 @@ const tickets = () => {
     const ticketTypeFromPayload = sanitizeTicketType(modalPayload.slice(divider + 1));
 
     if (interaction.user.id !== requestedByUserId) {
-      await interaction.reply({ content: "This ticket form is not for you.", ephemeral: true }).catch(() => {});
+      await interaction.reply({ content: "This ticket form is not for you.", flags: 64 }).catch(() => {});
       return;
     }
 
     const runtimeConfig = getRuntimeConfig();
     if (!interaction.guild) {
-      await interaction.reply({ content: "Tickets are only available in servers.", ephemeral: true }).catch(() => {});
+      await interaction.reply({ content: "Tickets are only available in servers.", flags: 64 }).catch(() => {});
       return;
     }
 
     if (!runtimeConfig.categoryId) {
       await interaction.reply({
         content: "Ticket category is not configured yet. Ask an admin to set ticketCategoryId.",
-        ephemeral: true,
+        flags: 64,
       }).catch(() => {});
       return;
     }
 
     const ticketSubject = interaction.fields.getTextInputValue(TICKET_SUBJECT_INPUT_ID).trim();
 
-    await interaction.deferReply({ ephemeral: true });
+    await interaction.deferReply({ flags: 64 });
     await createTicketForUser({
       interaction,
       runtimeConfig,
@@ -605,3 +605,4 @@ const tickets = () => {
 };
 
 module.exports = tickets;
+

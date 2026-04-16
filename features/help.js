@@ -1,4 +1,4 @@
-const path = require("node:path");
+﻿const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const { getHelpPages, getHelpRow } = require("../utils/helpContent");
 
@@ -16,7 +16,7 @@ const help = () => {
 
             collector.on("collect", async (i) => {
                 if (i.user.id !== message.author.id) {
-                    return i.reply({ content: "Only you can use these buttons for your help menu.", ephemeral: true });
+                    return i.reply({ content: "Only you can use these buttons for your help menu.", flags: 64 });
                 }
                 if (i.customId === "next" && page < helpPages.length - 1) page++;
                 if (i.customId === "prev" && page > 0) page--;

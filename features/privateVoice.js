@@ -1,4 +1,4 @@
-const path = require("node:path");
+﻿const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
 const {
   ActionRowBuilder,
@@ -259,7 +259,7 @@ const privateVoice = () => {
         if (!ownedChannel) {
           await interaction.reply({
             content: "You do not have an active private voice channel.",
-            ephemeral: true,
+            flags: 64,
           });
           return;
         }
@@ -267,7 +267,7 @@ const privateVoice = () => {
         if (interaction.channelId !== ownedChannel.id) {
           await interaction.reply({
             content: "Use the controls in your private voice channel chat.",
-            ephemeral: true,
+            flags: 64,
           });
           return;
         }
@@ -275,7 +275,7 @@ const privateVoice = () => {
         if (!interaction.member?.voice?.channelId || interaction.member.voice.channelId !== ownedChannel.id) {
           await interaction.reply({
             content: "Join your private voice channel first.",
-            ephemeral: true,
+            flags: 64,
           });
           return;
         }
@@ -294,7 +294,7 @@ const privateVoice = () => {
             }).catch(() => {});
           }
 
-          await interaction.reply({ content: "Channel locked.", ephemeral: true });
+          await interaction.reply({ content: "Channel locked.", flags: 64 });
           return;
         }
 
@@ -303,7 +303,7 @@ const privateVoice = () => {
             ViewChannel: true,
             Connect: true,
           });
-          await interaction.reply({ content: "Channel unlocked.", ephemeral: true });
+          await interaction.reply({ content: "Channel unlocked.", flags: 64 });
           return;
         }
 
@@ -361,14 +361,14 @@ const privateVoice = () => {
           await interaction.reply({
             content: contentMap[interaction.customId] || "Select a user:",
             components: [new ActionRowBuilder().addComponents(select)],
-            ephemeral: true,
+            flags: 64,
           });
         }
 
         if (interaction.customId === "pv_untrust") {
           const trusted = channelToTrusted.get(ownedChannel.id) || new Set();
           if (trusted.size === 0) {
-            await interaction.reply({ content: "No trusted users.", ephemeral: true });
+            await interaction.reply({ content: "No trusted users.", flags: 64 });
             return;
           }
 
@@ -387,7 +387,7 @@ const privateVoice = () => {
           await interaction.reply({
             content: `Trusted users: ${trustedList}\n\nSelect a user to untrust:`,
             components: [new ActionRowBuilder().addComponents(select)],
-            ephemeral: true,
+            flags: 64,
           });
         }
       }
@@ -399,7 +399,7 @@ const privateVoice = () => {
         if (!ownedChannel) {
           await interaction.reply({
             content: "You do not have an active private voice channel.",
-            ephemeral: true,
+            flags: 64,
           });
           return;
         }
@@ -410,12 +410,12 @@ const privateVoice = () => {
           if (!Number.isFinite(limit) || limit < 0 || limit > 99) {
             await interaction.reply({
               content: "Please enter a number between 0 and 99.",
-              ephemeral: true,
+              flags: 64,
             });
             return;
           }
           await ownedChannel.setUserLimit(limit).catch(() => {});
-          await interaction.reply({ content: "User limit updated.", ephemeral: true });
+          await interaction.reply({ content: "User limit updated.", flags: 64 });
           return;
         }
 
@@ -423,11 +423,11 @@ const privateVoice = () => {
           const raw = interaction.fields.getTextInputValue("pv_rename_value");
           const name = raw.trim().slice(0, 96);
           if (!name) {
-            await interaction.reply({ content: "Name cannot be empty.", ephemeral: true });
+            await interaction.reply({ content: "Name cannot be empty.", flags: 64 });
             return;
           }
           await ownedChannel.setName(name).catch(() => {});
-          await interaction.reply({ content: "Channel renamed.", ephemeral: true });
+          await interaction.reply({ content: "Channel renamed.", flags: 64 });
         }
       }
 
@@ -436,14 +436,14 @@ const privateVoice = () => {
 
         const pending = pendingAction.get(interaction.user.id);
         if (!pending) {
-          await interaction.reply({ content: "No pending action.", ephemeral: true });
+          await interaction.reply({ content: "No pending action.", flags: 64 });
           return;
         }
 
         const channel = await client.channels.fetch(pending.channelId).catch(() => null);
         if (!channel) {
           pendingAction.delete(interaction.user.id);
-          await interaction.reply({ content: "Channel not found.", ephemeral: true });
+          await interaction.reply({ content: "Channel not found.", flags: 64 });
           return;
         }
 
@@ -460,7 +460,7 @@ const privateVoice = () => {
           }).catch(() => {});
           
           pendingAction.delete(interaction.user.id);
-          await interaction.reply({ content: `<@${targetId}> is now trusted and can see the VC.`, ephemeral: true });
+          await interaction.reply({ content: `<@${targetId}> is now trusted and can see the VC.`, flags: 64 });
           return;
         }
 
@@ -469,14 +469,14 @@ const privateVoice = () => {
           trusted.delete(targetId);
           await channel.permissionOverwrites.delete(targetId).catch(() => {});
           pendingAction.delete(interaction.user.id);
-          await interaction.reply({ content: `<@${targetId}> is no longer trusted.`, ephemeral: true });
+          await interaction.reply({ content: `<@${targetId}> is no longer trusted.`, flags: 64 });
           return;
         }
 
         const member = channel.members.get(targetId);
         if (!member) {
           pendingAction.delete(interaction.user.id);
-          await interaction.reply({ content: "User is not in your channel.", ephemeral: true });
+          await interaction.reply({ content: "User is not in your channel.", flags: 64 });
           return;
         }
 
@@ -485,18 +485,18 @@ const privateVoice = () => {
           await member.voice.setMute(next).catch(() => {});
           await interaction.reply({
             content: next ? "User muted." : "User unmuted.",
-            ephemeral: true,
+            flags: 64,
           });
         } else if (pending.action === "pv_deafen") {
           const next = !member.voice.serverDeaf;
           await member.voice.setDeaf(next).catch(() => {});
           await interaction.reply({
             content: next ? "User deafened." : "User undeafened.",
-            ephemeral: true,
+            flags: 64,
           });
         } else if (pending.action === "pv_disconnect") {
           await member.voice.setChannel(null).catch(() => {});
-          await interaction.reply({ content: "User disconnected.", ephemeral: true });
+          await interaction.reply({ content: "User disconnected.", flags: 64 });
         }
 
         pendingAction.delete(interaction.user.id);
@@ -508,3 +508,4 @@ const privateVoice = () => {
 };
 
 module.exports = privateVoice;
+

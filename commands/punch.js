@@ -1,4 +1,4 @@
-const { SlashCommandBuilder,channelMention,userMention,roleMention } = require('discord.js');
+﻿const { SlashCommandBuilder,channelMention,userMention,roleMention } = require('discord.js');
 
 var arr=[
 "https://media.giphy.com/media/13HXKG2HGN8aPK/giphy.gif",
@@ -27,7 +27,8 @@ module.exports = {
 		const member = interaction.options.getMember('target');
     if(!member) return;
     const user=userMention(member.id);
-		return interaction.reply({ content: `You punched `+user,embeds:[exampleEmbed], ephemeral: false });
+		return interaction.reply({ content: `You punched `+user,embeds:[exampleEmbed], flags: 0 });
     // return interaction.reply({content: ${}})
 	},
 };
+

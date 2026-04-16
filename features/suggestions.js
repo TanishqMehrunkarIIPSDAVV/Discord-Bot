@@ -86,7 +86,7 @@ const suggestions = () => {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
           content: "Failed to open suggestion form. Please try again.",
-          ephemeral: true,
+          flags: 64,
         }).catch(() => {});
       }
     }
@@ -97,7 +97,7 @@ const suggestions = () => {
     if (interaction.customId !== SUGGESTION_MODAL_ID) return;
 
     try {
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: 64 });
 
       const config = loadConfig();
       const postChannelId =
@@ -160,3 +160,4 @@ const suggestions = () => {
 };
 
 module.exports = suggestions;
+

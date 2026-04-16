@@ -235,7 +235,7 @@ const complaints = () => {
   client.on("interactionCreate", async (interaction) => {
     if (interaction.isButton() && interaction.customId === COMPLAINT_CREATE_BUTTON_ID) {
       await interaction.reply({
-        ephemeral: true,
+        flags: 64,
         content: "Choose the type of complaint you want to file:",
         components: [buildComplaintTypeSelectRow(interaction.user.id)],
       }).catch(() => {});
@@ -253,7 +253,7 @@ const complaints = () => {
 
       if (requestedById !== user.id) {
         await interaction.reply({
-          ephemeral: true,
+          flags: 64,
           content: "This complaint menu is not for you.",
         }).catch(() => {});
         return;
@@ -265,7 +265,7 @@ const complaints = () => {
 
       if (!runtimeConfig.categoryId) {
         await interaction.reply({
-          ephemeral: true,
+          flags: 64,
           content: "Complaint category is not configured. Ask an admin to set complaintCategoryId.",
         }).catch(() => {});
         return;
@@ -274,13 +274,13 @@ const complaints = () => {
       const category = guild.channels.cache.get(runtimeConfig.categoryId);
       if (!category || category.type !== ChannelType.GuildCategory) {
         await interaction.reply({
-          ephemeral: true,
+          flags: 64,
           content: "Configured complaint category is invalid. Ask an admin to verify complaintCategoryId.",
         }).catch(() => {});
         return;
       }
 
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: 64 });
 
       const permissionOverwrites = [
         {
@@ -425,7 +425,7 @@ const complaints = () => {
     try {
       const runtimeConfig = getRuntimeConfig();
 
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: 64 });
 
       const parts = interaction.customId.split("_");
       const channelId = parts[2]; // Index 2 because: 0=solve, 1=complaint, 2=channelId, 3=userId
@@ -639,3 +639,4 @@ const complaints = () => {
 };
 
 module.exports = complaints;
+

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder,channelMention,userMention,roleMention} = require('discord.js');
+﻿const { SlashCommandBuilder,channelMention,userMention,roleMention} = require('discord.js');
 
 var arr=[
   "https://media.giphy.com/media/lDPPhStHv9Jfpem7wI/giphy.gif",
@@ -18,7 +18,8 @@ module.exports = {
     		url: arr[Math.floor(Math.random()*arr.length)],
     	},
     };
-		return interaction.reply({ content: `May I Rest In Peace`+` `,embeds:[exampleEmbed], ephemeral: false });
+		return interaction.reply({ content: `May I Rest In Peace`+` `,embeds:[exampleEmbed], flags: 0 });
     // return interaction.reply({content: ${}})
 	},
 };
+

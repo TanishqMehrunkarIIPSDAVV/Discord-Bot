@@ -188,7 +188,7 @@ const confessions = () => {
       const user = interaction.user;
 
       // Defer reply
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: 64 });
 
       // Send DM to user
       const dmChannel = await user.createDM().catch(() => null);
@@ -349,3 +349,4 @@ const confessions = () => {
 };
 
 module.exports = confessions;
+

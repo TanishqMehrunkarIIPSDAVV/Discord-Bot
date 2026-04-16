@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, userMention } = require('discord.js');
+﻿const { SlashCommandBuilder, userMention } = require('discord.js');
 
 const arr = [
   "https://media.giphy.com/media/M9Tvo7WALVoelIKZXa/giphy.gif",
@@ -24,7 +24,7 @@ module.exports = {
     try {
       const member = interaction.options.getMember('target');
       if (!member) {
-        return await interaction.reply({ content: 'Please select a valid member.', ephemeral: true });
+        return await interaction.reply({ content: 'Please select a valid member.', flags: 64 });
       }
 
       const exampleEmbed = {
@@ -35,14 +35,14 @@ module.exports = {
       };
 
       const u = userMention(member.id);
-      return await interaction.reply({ content: `You kicked ${u}`, embeds: [exampleEmbed], ephemeral: false });
+      return await interaction.reply({ content: `You kicked ${u}`, embeds: [exampleEmbed], flags: 0 });
     } catch (err) {
       console.error('kick command error:', err);
       try {
         if (interaction.deferred || interaction.replied) {
           await interaction.editReply({ content: 'There was an error executing this command.' });
         } else {
-          await interaction.reply({ content: 'There was an error executing this command.', ephemeral: true });
+          await interaction.reply({ content: 'There was an error executing this command.', flags: 64 });
         }
       } catch (e) {
         console.error('kick error reply failed:', e);

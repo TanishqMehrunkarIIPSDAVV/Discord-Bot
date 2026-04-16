@@ -1,4 +1,4 @@
-"use strict";
+﻿"use strict";
 
 const originalEmitWarning = process.emitWarning.bind(process);
 process.emitWarning = (warning, ...args) => {
@@ -86,7 +86,7 @@ client.on('interactionCreate', async (interaction) => {
         await command.execute(interaction);
     } catch (error) {
         console.error(`Error while executing /${interaction.commandName}:`, error);
-        const errorReply = { content: 'There was an error while executing this command.', ephemeral: true };
+        const errorReply = { content: 'There was an error while executing this command.', flags: 64 };
 
         if (interaction.deferred || interaction.replied) {
             await interaction.followUp(errorReply).catch(() => {});
@@ -178,6 +178,8 @@ const announcement = require("./features/announcement");
 announcement();
 const revivalMentions = require("./features/revivalMentions");
 revivalMentions();
+const userRatings = require("./features/userRatings");
+userRatings();
 const suggestions = require("./features/suggestions");
 suggestions();
 const quest = require("./features/quest");
@@ -189,3 +191,4 @@ client.login(token).catch((err) => {
     process.exit(1);
 });
 console.log('tested');
+
