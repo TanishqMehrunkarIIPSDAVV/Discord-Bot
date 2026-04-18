@@ -27,6 +27,39 @@ let isLiveMilestoneSyncRunning = false;
 const formatPoints = (value) => Number(value || 0).toFixed(2);
 const formatHours = (value) => Number(value || 0).toFixed(2);
 
+const isInactiveInVoice = (voiceState) =>
+  Boolean(voiceState?.mute || voiceState?.selfMute || voiceState?.deaf || voiceState?.selfDeaf);
+
+const countNonBotUsersInVoiceChannel = (channel) => {
+  if (!channel?.members) return 0;
+
+  let count = 0;
+  for (const member of channel.members.values()) {
+    if (!member.user?.bot) count += 1;
+  }
+
+  return count;
+};
+
+const reconcileVoiceChannelSessions = (channel) => {
+  if (!channel?.members) return;
+
+  const hasMinimumHumans = countNonBotUsersInVoiceChannel(channel) >= 2;
+  for (const member of channel.members.values()) {
+    if (member.user?.bot) continue;
+
+    const guildId = channel.guild.id;
+    const userId = member.id;
+    startSession(guildId, userId);
+
+    if (isInactiveInVoice(member.voice) || !hasMinimumHumans) {
+      pauseSession(guildId, userId);
+    } else {
+      resumeSession(guildId, userId);
+    }
+  }
+};
+
 const resolveUserIdFromArg = async (message, rawArg) => {
   const firstMention = message.mentions.users.first();
   if (firstMention) return firstMention.id;
@@ -201,6 +234,7 @@ const handlePrefixCommands = async (message) => {
 
 const reconcileSessionsOnReady = async () => {
   const liveSessions = new Set();
+  const liveChannelKeys = new Set();
 
   for (const guild of client.guilds.cache.values()) {
     for (const state of guild.voiceStates.cache.values()) {
@@ -213,10 +247,7 @@ const reconcileSessionsOnReady = async () => {
       liveSessions.add(key);
       startSession(guild.id, userId);
 
-      const isInactive = state.mute || state.selfMute || state.deaf || state.selfDeaf;
-      if (isInactive) {
-        pauseSession(guild.id, userId);
-      }
+      liveChannelKeys.add(`${guild.id}:${state.channelId}`);
     }
   }
 
@@ -225,6 +256,16 @@ const reconcileSessionsOnReady = async () => {
     const key = `${entry.guildId}:${entry.userId}`;
     if (!liveSessions.has(key)) {
       dropSession(entry.guildId, entry.userId);
+    }
+  }
+
+  // Keep sessions paused unless channel has at least two non-bot users and member is active.
+  for (const channelKey of liveChannelKeys) {
+    const [guildId, channelId] = channelKey.split(":");
+    const guild = client.guilds.cache.get(guildId);
+    const channel = guild?.channels?.cache?.get(channelId);
+    if (channel) {
+      reconcileVoiceChannelSessions(channel);
     }
   }
 };
@@ -244,12 +285,6 @@ const vcPoints = () => {
     // Handle joining voice channel
     if (!wasInVoice && isInVoice) {
       startSession(guildId, userId);
-
-      const isInactive = newState.mute || newState.selfMute || newState.deaf || newState.selfDeaf;
-      if (isInactive) {
-        pauseSession(guildId, userId);
-      }
-      return;
     }
 
     // Handle leaving voice channel
@@ -259,29 +294,19 @@ const vcPoints = () => {
       if (guild) {
         await syncMilestoneRoleForUser(guild, userId, { announce: true });
       }
-      return;
     }
 
-    // Handle mute/deafen state changes while in voice
-    if (isInVoice) {
-      const wasMuted = oldState.mute || oldState.selfMute;
-      const isMuted = newState.mute || newState.selfMute;
-      
-      const wasDeafened = oldState.deaf || oldState.selfDeaf;
-      const isDeafened = newState.deaf || newState.selfDeaf;
+    // Reconcile old/new channels for join/leave/move/mute/deafen transitions.
+    const channelsToReconcile = [];
+    if (oldState.channel) {
+      channelsToReconcile.push(oldState.channel);
+    }
+    if (newState.channel && newState.channelId !== oldState.channelId) {
+      channelsToReconcile.push(newState.channel);
+    }
 
-      const wasInactive = wasMuted || wasDeafened;
-      const isInactive = isMuted || isDeafened;
-
-      // Transitioned from active to inactive (muted/deafened)
-      if (!wasInactive && isInactive) {
-        pauseSession(guildId, userId);
-      }
-
-      // Transitioned from inactive to active (unmuted/undeafened)
-      if (wasInactive && !isInactive) {
-        resumeSession(guildId, userId);
-      }
+    for (const channel of channelsToReconcile) {
+      reconcileVoiceChannelSessions(channel);
     }
   });
 
