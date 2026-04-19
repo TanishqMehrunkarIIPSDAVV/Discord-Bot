@@ -283,6 +283,20 @@ const buildScoreAverage = (entries, field) => {
   return Number((sum / entries.length).toFixed(1));
 };
 
+const hasExistingRating = (state, guildId, raterUserId, targetUserId) => {
+  const guildRatings = state.ratings[String(guildId)] || {};
+  const targetRatings = Array.isArray(guildRatings[String(targetUserId)]) ? guildRatings[String(targetUserId)] : [];
+
+  return targetRatings.some((entry) => String(entry.raterUserId) === String(raterUserId));
+};
+
+const hasExistingPairRating = (state, guildId, userAId, userBId) => {
+  return (
+    hasExistingRating(state, guildId, userAId, userBId) ||
+    hasExistingRating(state, guildId, userBId, userAId)
+  );
+};
+
 const recordConversationMessage = ({
   guildId,
   channelId,
@@ -330,6 +344,11 @@ const recordConversationMessage = ({
   }
 
   if (now - toInteger(channelState.lastPromptAt, 0) < promptCooldownMs) {
+    saveState(state);
+    return { shouldPrompt: false };
+  }
+
+  if (hasExistingPairRating(state, guildId, uniqueParticipants[0], uniqueParticipants[1])) {
     saveState(state);
     return { shouldPrompt: false };
   }
@@ -412,6 +431,11 @@ const recordVoiceConversation = ({
 
   const activePrompt = getActivePromptForChannel(state, guildId, channelId, now);
   if (activePrompt) {
+    saveState(state);
+    return { shouldPrompt: false };
+  }
+
+  if (hasExistingPairRating(state, guildId, uniqueParticipants[0], uniqueParticipants[1])) {
     saveState(state);
     return { shouldPrompt: false };
   }
@@ -512,6 +536,10 @@ const submitPromptRating = ({ promptId, raterUserId, scores }) => {
   const targetUserId = prompt.participants.find((id) => id !== raterId);
   if (!targetUserId) {
     return { ok: false, reason: "Could not determine the other user to rate." };
+  }
+
+  if (hasExistingRating(state, prompt.guildId, raterId, targetUserId)) {
+    return { ok: false, reason: "You have already rated this user." };
   }
 
   for (const field of RATING_FIELDS) {
