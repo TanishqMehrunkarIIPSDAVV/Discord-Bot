@@ -3,6 +3,12 @@ const path = require("node:path");
 
 const POINTS_PER_MINUTE = 0.1; // 10 minutes = 1 point
 const DATA_PATH = path.join(__dirname, "..", "data", "vc-points.json");
+const LEADERBOARD_TIMEFRAMES = Object.freeze({
+  ALL: "all",
+  DAILY: "daily",
+  WEEKLY: "weekly",
+  MONTHLY: "monthly",
+});
 
 const MILESTONES = [
   { points: 50, name: "🎧 ✦ 𝐕𝐂 𝐍𝐄𝐖𝐁𝐈𝐄 ✦ 🎧", roleId: "1491883856083550228" },
@@ -55,6 +61,74 @@ const saveStore = () => {
 
 const sessionKey = (guildId, userId) => `${guildId}:${userId}`;
 
+const normalizeLeaderboardTimeframe = (value) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) return LEADERBOARD_TIMEFRAMES.ALL;
+
+  if (["daily", "day", "d"].includes(normalized)) return LEADERBOARD_TIMEFRAMES.DAILY;
+  if (["weekly", "week", "w"].includes(normalized)) return LEADERBOARD_TIMEFRAMES.WEEKLY;
+  if (["monthly", "month", "m"].includes(normalized)) return LEADERBOARD_TIMEFRAMES.MONTHLY;
+  if (["all", "alltime", "all-time", "lifetime", "overall", "a"].includes(normalized)) {
+    return LEADERBOARD_TIMEFRAMES.ALL;
+  }
+
+  return LEADERBOARD_TIMEFRAMES.ALL;
+};
+
+const getLeaderboardTimeframeLabel = (timeframe) => {
+  const normalized = normalizeLeaderboardTimeframe(timeframe);
+  if (normalized === LEADERBOARD_TIMEFRAMES.DAILY) return "Daily";
+  if (normalized === LEADERBOARD_TIMEFRAMES.WEEKLY) return "Weekly";
+  if (normalized === LEADERBOARD_TIMEFRAMES.MONTHLY) return "Monthly";
+  return "All Time";
+};
+
+const getUtcDateKey = (valueMs) => {
+  const date = new Date(valueMs);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getUtcNextDayStartMs = (valueMs) => {
+  const date = new Date(valueMs);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1, 0, 0, 0, 0);
+};
+
+const getLeaderboardRangeStartMs = (timeframe, nowMs = Date.now()) => {
+  const normalized = normalizeLeaderboardTimeframe(timeframe);
+  const now = new Date(nowMs);
+
+  if (normalized === LEADERBOARD_TIMEFRAMES.DAILY) {
+    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0);
+  }
+
+  if (normalized === LEADERBOARD_TIMEFRAMES.WEEKLY) {
+    const weekday = now.getUTCDay(); // Sunday=0
+    const daysFromMonday = (weekday + 6) % 7;
+    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - daysFromMonday, 0, 0, 0, 0);
+  }
+
+  if (normalized === LEADERBOARD_TIMEFRAMES.MONTHLY) {
+    return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0);
+  }
+
+  return null;
+};
+
+const getDateKeysInRange = (startMs, endMs) => {
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return [];
+
+  const keys = [];
+  let cursor = startMs;
+  while (cursor < endMs) {
+    keys.push(getUtcDateKey(cursor));
+    cursor = getUtcNextDayStartMs(cursor);
+  }
+  return keys;
+};
+
 const getPendingMinutes = (guildId, userId, nowMs = Date.now()) => {
   const data = loadStore();
   const session = data.activeSessions[sessionKey(guildId, userId)];
@@ -86,8 +160,13 @@ const ensureGuildUser = (guildId, userId) => {
     data.guilds[guildId].users[userId] = {
       points: 0,
       trackedMinutes: 0,
+      dailyMinutes: {},
       lastUpdatedAt: Date.now(),
     };
+  }
+
+  if (!data.guilds[guildId].users[userId].dailyMinutes || typeof data.guilds[guildId].users[userId].dailyMinutes !== "object") {
+    data.guilds[guildId].users[userId].dailyMinutes = {};
   }
 
   return data.guilds[guildId].users[userId];
@@ -100,6 +179,38 @@ const awardMinutes = (guildId, userId, minutesDelta) => {
   const entry = ensureGuildUser(guildId, userId);
   const pointsDelta = safeMinutes * POINTS_PER_MINUTE;
   entry.trackedMinutes = Number(entry.trackedMinutes || 0) + safeMinutes;
+  entry.points = Number(entry.points || 0) + pointsDelta;
+  const todayKey = getUtcDateKey(Date.now());
+  entry.dailyMinutes[todayKey] = Number(entry.dailyMinutes[todayKey] || 0) + safeMinutes;
+  entry.lastUpdatedAt = Date.now();
+  return pointsDelta;
+};
+
+const awardSessionDuration = (guildId, userId, startMs, endMs) => {
+  const safeStartMs = Number(startMs);
+  const safeEndMs = Number(endMs);
+  if (!Number.isFinite(safeStartMs) || !Number.isFinite(safeEndMs) || safeEndMs <= safeStartMs) return 0;
+
+  const entry = ensureGuildUser(guildId, userId);
+  let totalMinutes = 0;
+  let cursor = safeStartMs;
+
+  while (cursor < safeEndMs) {
+    const segmentEnd = Math.min(safeEndMs, getUtcNextDayStartMs(cursor));
+    const segmentMinutes = Math.max(0, (segmentEnd - cursor) / 60000);
+    if (segmentMinutes > 0) {
+      const dateKey = getUtcDateKey(cursor);
+      entry.dailyMinutes[dateKey] = Number(entry.dailyMinutes[dateKey] || 0) + segmentMinutes;
+      totalMinutes += segmentMinutes;
+    }
+
+    cursor = segmentEnd;
+  }
+
+  if (totalMinutes <= 0) return 0;
+
+  const pointsDelta = totalMinutes * POINTS_PER_MINUTE;
+  entry.trackedMinutes = Number(entry.trackedMinutes || 0) + totalMinutes;
   entry.points = Number(entry.points || 0) + pointsDelta;
   entry.lastUpdatedAt = Date.now();
   return pointsDelta;
@@ -134,10 +245,7 @@ const stopSession = (guildId, userId, endedAtMs = Date.now()) => {
     effectiveEnd = Number(session.pausedAt);
   }
 
-  const elapsedMs = Math.max(0, effectiveEnd - start);
-  const elapsedMinutes = elapsedMs / 60000;
-
-  const pointsDelta = awardMinutes(guildId, userId, elapsedMinutes);
+  const pointsDelta = awardSessionDuration(guildId, userId, start, effectiveEnd);
   delete data.activeSessions[key];
   saveStore();
   return pointsDelta;
@@ -215,23 +323,59 @@ const getUserStats = (guildId, userId) => {
   };
 };
 
-const getLeaderboard = (guildId, limit = 10) => {
+const getSessionPendingMinutesInRange = (session, rangeStartMs, nowMs) => {
+  const sessionStart = Number(session?.startedAt);
+  if (!Number.isFinite(sessionStart)) return 0;
+
+  const effectiveEnd = session?.pausedAt ? Number(session.pausedAt) : nowMs;
+  if (!Number.isFinite(effectiveEnd) || effectiveEnd <= sessionStart) return 0;
+
+  const overlapStart = Math.max(sessionStart, rangeStartMs);
+  const overlapMs = Math.max(0, effectiveEnd - overlapStart);
+  return overlapMs / 60000;
+};
+
+const getTrackedMinutesInRange = (entry, rangeStartMs, rangeEndMs) => {
+  const dailyMinutes = entry?.dailyMinutes && typeof entry.dailyMinutes === "object" ? entry.dailyMinutes : {};
+  const keys = getDateKeysInRange(rangeStartMs, rangeEndMs);
+
+  let total = 0;
+  for (const key of keys) {
+    total += Number(dailyMinutes[key] || 0);
+  }
+
+  return total;
+};
+
+const getLeaderboard = (guildId, limit = 10, timeframe = LEADERBOARD_TIMEFRAMES.ALL) => {
   const data = loadStore();
   const guild = data.guilds[guildId];
   const users = guild?.users && typeof guild.users === "object" ? guild.users : {};
   const combined = new Map();
+  const normalizedTimeframe = normalizeLeaderboardTimeframe(timeframe);
+  const nowMs = Date.now();
+  const rangeStartMs = getLeaderboardRangeStartMs(normalizedTimeframe, nowMs);
 
   for (const [userId, value] of Object.entries(users)) {
+    const trackedMinutes =
+      normalizedTimeframe === LEADERBOARD_TIMEFRAMES.ALL
+        ? Number(value?.trackedMinutes || 0)
+        : getTrackedMinutesInRange(value, rangeStartMs, nowMs);
+
     combined.set(userId, {
       userId,
-      points: Number(value?.points || 0),
-      trackedMinutes: Number(value?.trackedMinutes || 0),
+      points: trackedMinutes * POINTS_PER_MINUTE,
+      trackedMinutes,
     });
   }
 
   for (const session of Object.values(data.activeSessions || {})) {
     if (session.guildId !== guildId) continue;
-    const pendingMinutes = getPendingMinutes(guildId, session.userId);
+    const pendingMinutes =
+      normalizedTimeframe === LEADERBOARD_TIMEFRAMES.ALL
+        ? getPendingMinutes(guildId, session.userId, nowMs)
+        : getSessionPendingMinutesInRange(session, rangeStartMs, nowMs);
+
     const existing = combined.get(session.userId) || {
       userId: session.userId,
       points: 0,
@@ -256,6 +400,7 @@ const listActiveSessions = () => {
 
 module.exports = {
   POINTS_PER_MINUTE,
+  LEADERBOARD_TIMEFRAMES,
   MILESTONES,
   loadStore,
   saveStore,
@@ -266,6 +411,8 @@ module.exports = {
   resumeSession,
   getUserStats,
   getLeaderboard,
+  normalizeLeaderboardTimeframe,
+  getLeaderboardTimeframeLabel,
   listActiveSessions,
   getCurrentMilestone,
   getNextMilestone,

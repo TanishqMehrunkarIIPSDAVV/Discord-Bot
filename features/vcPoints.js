@@ -14,6 +14,8 @@ const {
   listActiveSessions,
   getCurrentMilestone,
   getNextMilestone,
+  normalizeLeaderboardTimeframe,
+  getLeaderboardTimeframeLabel,
   MILESTONES,
 } = require("../utils/vcPointsStore");
 
@@ -26,6 +28,23 @@ let isLiveMilestoneSyncRunning = false;
 
 const formatPoints = (value) => Number(value || 0).toFixed(2);
 const formatHours = (value) => Number(value || 0).toFixed(2);
+const LEADERBOARD_TIMEFRAME_ALIASES = new Set([
+  "daily",
+  "day",
+  "d",
+  "weekly",
+  "week",
+  "w",
+  "monthly",
+  "month",
+  "m",
+  "all",
+  "alltime",
+  "all-time",
+  "lifetime",
+  "overall",
+  "a",
+]);
 
 const isInactiveInVoice = (voiceState) =>
   Boolean(voiceState?.mute || voiceState?.selfMute || voiceState?.deaf || voiceState?.selfDeaf);
@@ -99,20 +118,42 @@ const sendUserPoints = async (message, targetUserId) => {
   );
 };
 
-const sendLeaderboard = async (message, limitArg) => {
-  const requestedLimit = Number(limitArg);
-  const limit = Number.isFinite(requestedLimit)
-    ? Math.min(25, Math.max(1, Math.floor(requestedLimit)))
-    : 10;
+const parseLeaderboardArgs = (args = []) => {
+  let timeframe = "all";
+  let limit = 10;
 
-  const rows = getLeaderboard(message.guild.id, limit);
+  for (const rawArg of args) {
+    const arg = String(rawArg || "").trim();
+    if (!arg) continue;
+
+    const asNumber = Number(arg);
+    if (Number.isFinite(asNumber)) {
+      limit = Math.min(25, Math.max(1, Math.floor(asNumber)));
+      continue;
+    }
+
+    const lowered = arg.toLowerCase();
+    if (LEADERBOARD_TIMEFRAME_ALIASES.has(lowered)) {
+      timeframe = normalizeLeaderboardTimeframe(lowered);
+    }
+  }
+
+  return { limit, timeframe };
+};
+
+const sendLeaderboard = async (message, args = []) => {
+  const { limit, timeframe } = parseLeaderboardArgs(args);
+  const timeframeLabel = getLeaderboardTimeframeLabel(timeframe);
+
+  const rows = getLeaderboard(message.guild.id, limit, timeframe);
   if (!rows.length) {
-    return message.channel.send("No VC points have been recorded in this server yet.");
+    return message.channel.send(`No VC points have been recorded for the ${timeframeLabel.toLowerCase()} leaderboard yet.`);
   }
 
   const lines = rows.map((entry, index) => {
     const rank = index + 1;
-    const milestone = getCurrentMilestone(entry.points);
+    const lifetimeStats = getUserStats(message.guild.id, entry.userId);
+    const milestone = getCurrentMilestone(lifetimeStats.points);
     const roleLabel = milestone ? milestone.name : "No milestone yet";
     return `${rank}. ${userMention(entry.userId)} - **${formatPoints(entry.points)}** points (**${formatHours(
       entry.trackedMinutes / 60
@@ -121,7 +162,7 @@ const sendLeaderboard = async (message, limitArg) => {
 
   const embed = new EmbedBuilder()
     .setColor("#2B8AF7")
-    .setTitle(`VC Points Leaderboard (Top ${rows.length})`)
+    .setTitle(`${timeframeLabel} VC Points Leaderboard (Top ${rows.length})`)
     .setDescription(lines.join("\n"));
 
   return message.channel.send({ embeds: [embed] });
@@ -228,7 +269,7 @@ const handlePrefixCommands = async (message) => {
   }
 
   if (command === "vcleaderboard") {
-    return sendLeaderboard(message, parts[2]);
+    return sendLeaderboard(message, parts.slice(2));
   }
 };
 
