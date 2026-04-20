@@ -4,7 +4,7 @@ const {
   saveUserGradientRole,
 } = require('../utils/gradientRoleStore');
 
-const ROLE_POSITION = 60;
+const GRADIENT_ANCHOR_ROLE_ID = '1450497858473164821';
 
 const buildGradientRoleName = (startColor, endColor) => `GRAD-${startColor}-${endColor}`;
 
@@ -121,6 +121,31 @@ module.exports = {
     }
 
     try {
+      const anchorRole = guild.roles.cache.get(GRADIENT_ANCHOR_ROLE_ID);
+      if (!anchorRole) {
+        return interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setTitle('Anchor Role Not Found')
+              .setDescription(`I could not find the anchor role with ID ${GRADIENT_ANCHOR_ROLE_ID}.`),
+          ],
+        });
+      }
+
+      // Place gradient roles directly above the anchor role in the role list.
+      const rolePosition = anchorRole.position + 1;
+      if (botHighestRole.position <= rolePosition) {
+        return interaction.editReply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor('Red')
+              .setTitle('Role Hierarchy Issue')
+              .setDescription(`I cannot place roles near ${anchorRole.name}. Move my highest role above that level and try again.`),
+          ],
+        });
+      }
+
       const existingGradientRole = guild.roles.cache.find(role => role.name === roleName);
 
       // Get user's previous gradient role and remove it
@@ -131,6 +156,10 @@ module.exports = {
           if (oldRole) {
             // If user already has the exact target gradient role, keep it and finish early.
             if (existingGradientRole && oldRole.id === existingGradientRole.id) {
+              if (oldRole.position !== rolePosition) {
+                await oldRole.setPosition(rolePosition).catch(() => {});
+              }
+
               if (!interaction.member.roles.cache.has(oldRole.id)) {
                 await interaction.member.roles.add(oldRole);
               }
@@ -166,19 +195,6 @@ module.exports = {
         }
       }
 
-      // Fixed role position required by server policy
-      const rolePosition = ROLE_POSITION;
-      if (botHighestRole.position <= rolePosition) {
-        return interaction.editReply({
-          embeds: [
-            new EmbedBuilder()
-              .setColor('Red')
-              .setTitle('Role Hierarchy Issue')
-              .setDescription(`I cannot place roles at position ${rolePosition}. Move my highest role above that position and try again.`),
-          ],
-        });
-      }
-
       // Create role with gradient colors
       const startColorDecimal = hexToDecimal(startColor);
       const endColorDecimal = hexToDecimal(endColor);
@@ -196,6 +212,10 @@ module.exports = {
           reason: `Gradient role created by ${interaction.user.tag}`,
         });
         actionLabel = 'Created and Assigned';
+      }
+
+      if (targetRole.position !== rolePosition) {
+        await targetRole.setPosition(rolePosition).catch(() => {});
       }
 
       // Assign role to user

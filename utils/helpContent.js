@@ -51,6 +51,8 @@ const getHelpPages = () => {
     const channelLogChannel = fmtChannel(cfg.channelLogChannelId, "configured channel log channel");
     const voiceLogChannel = fmtChannel(cfg.voiceLogChannelId, "configured voice log channel");
     const modLogChannel = fmtChannel(cfg.modLogChannelId, "configured mod log channel");
+    const questShopChannel = fmtChannel(cfg.questShopChannelId, "configured quest shop channel");
+    const milestoneAnnounceChannel = fmtChannel(cfg.milestoneAnnounceChannelId, "configured VC milestone channel");
     const verifyChannelId = pickFirstString(cfg, ["verifyChannelId", "verificationChannelId", "verificationFlowChannelId"]);
     const verifyChannel = fmtChannel(verifyChannelId, "configured verify channel");
     const aiReplyChannels = formatAiChannels(cfg);
@@ -86,8 +88,9 @@ const getHelpPages = () => {
             `• </removeme:> Schedule VC removal\n` +
             `• </vcguard:> Enable/disable VC guard\n` +
             `• </quest:> Show quest board, stats, history, leaderboard, or trash active quest\n` +
+            `• </questadmin refresh:> Admin-only quest cycle refresh\n` +
             `• </vcpoints:> Show VC points for you or a user\n` +
-            `• </vcleaderboard:> Show VC points leaderboard\n`
+            `• </vcleaderboard:> Show VC points leaderboard (daily/weekly/monthly/all)\n`
         )
         .setFooter({ text: "Use the ⏭️ Next and ⏮️ Previous buttons to navigate pages!" }),
         new EmbedBuilder()
@@ -125,7 +128,20 @@ const getHelpPages = () => {
             `• \`ct vc\` Mention users in your VC\n` +
             `• \`ct quest [board|stats|history|leaderboard|trash]\` Show quest views or trash active quest\n` +
             `• \`ct vcpoints [user]\` Show VC points for you or a user\n` +
-            `• \`ct vcleaderboard [limit]\` Show VC points leaderboard\n`
+            `• \`ct vcleaderboard [daily|weekly|monthly|all] [limit]\` Show VC points leaderboard with filters\n\n` +
+            `🪙 **Economy & Shop**\n` +
+            `• \`ct coin\` Show your quest coin balance\n` +
+            `• \`ct coin gift @user <amount>\` Gift quest coins to another user\n` +
+            `• \`ct gamble <amount|all>\` Gamble quest coins\n` +
+            `• \`ct shop help\` Show shop admin commands\n` +
+            `• \`ct shop setchannel <#channel|channelId>\` Set shop panel channel\n` +
+            `• \`ct shop post\` Post/update shop panel embed\n` +
+            `• \`ct shop setprice <perkId> <coins>\` Update perk price\n` +
+            `• \`ct shop setduration <perkId> <hours>\` Update perk duration (except custom role)\n` +
+            `• \`ct shop setlimit <perkId> <count|none>\` Update weekly perk cap\n` +
+            `• \`ct shop setpremiumroles <roleId1> <roleId2>\` Configure premium shop roles\n` +
+            `• \`ct shop enable <perkId>\` or \`ct shop disable <perkId>\` Toggle perks\n` +
+            `• \`ct shop list\` Show perk configs\n`
         )
         .setFooter({ text: "Use the ⏮️ Previous and ⏭️ Next buttons to navigate pages!" }),
         new EmbedBuilder()
@@ -146,6 +162,13 @@ const getHelpPages = () => {
             `• Channel logs: ${channelLogChannel}\n` +
             `• Voice logs: ${voiceLogChannel}\n` +
             `• Mod logs: ${modLogChannel}\n\n` +
+            `🛒 **Quest Shop**\n` +
+            `• Shop panel channel: ${questShopChannel}\n` +
+            `• Buying is embed-based via buttons (buy for self or gift)\n` +
+            `• Gifted perks require recipient accept/decline\n` +
+            `• Custom role perk asks for role name in a modal, expires in 7 days, and auto-deletes\n\n` +
+            `🎯 **VC Milestones**\n` +
+            `• Milestone announcements: ${milestoneAnnounceChannel}\n\n` +
             `🎨 **Gradient Roles**\n` +
             `• Custom gradient roles are created from the two hex colors you provide\n` +
             `• Existing matching gradients are reused, not duplicated\n` +

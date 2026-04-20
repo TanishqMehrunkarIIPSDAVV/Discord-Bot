@@ -1,5 +1,6 @@
 const path = require("node:path");
 const client = require(`${path.dirname(__dirname)}/index.js`);
+const config = require("../config.json");
 const { userMention, EmbedBuilder } = require("discord.js");
 const {
   startSession,
@@ -20,7 +21,7 @@ const {
 } = require("../utils/vcPointsStore");
 
 const PREFIX = "ct";
-const MILESTONE_ANNOUNCE_CHANNEL_ID = "1439523872331534366";
+const MILESTONE_ANNOUNCE_CHANNEL_ID = String(config.milestoneAnnounceChannelId || "").trim();
 const LIVE_MILESTONE_SYNC_INTERVAL_MS = 30000;
 
 let liveMilestoneTicker = null;
@@ -171,6 +172,7 @@ const sendLeaderboard = async (message, args = []) => {
 const getMilestoneRoleIds = () => MILESTONES.map((milestone) => milestone.roleId);
 
 const announceMilestone = async (guild, userId, milestone, points) => {
+  if (!MILESTONE_ANNOUNCE_CHANNEL_ID) return;
   const channel = await guild.channels.fetch(MILESTONE_ANNOUNCE_CHANNEL_ID).catch(() => null);
   if (!channel || !channel.isTextBased()) return;
 

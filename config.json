@@ -55,6 +55,13 @@
   "questBlockedChannelIds": [
     "1439523872331534366"
   ],
+  "milestoneAnnounceChannelId": "1439523872331534366",
+  "questShopChannelId": "1495851120491495505",
+  "questShopPremiumRole1Id": "1495836381447061618",
+  "questShopPremiumRole2Id": "1495836569276256468",
+  "questShopNicknameRoleId": "1495837112946135091",
+  "questShopAttachmentRoleId": "1495837377975816262",
+  "questShopCustomRoleAnchorRoleId": "858924540788211723",
   "warnCounts": {
     "714168295854440570": {}
   }

@@ -13,6 +13,7 @@ const ECHO_CHAT_COOLDOWN_MS = 8_000;
 const QUEST_TRASH_COOLDOWN_MS = 3 * 60 * 1000;
 const USER_QUEST_CHOICES_COUNT = 4;
 const QUEST_CATALOG_PATH = path.join(__dirname, "..", "data", "quest-catalog.json");
+let questXpBoostResolver = () => 1;
 
 const CATEGORY_ICON_MAP = {
   chat: "💬",
@@ -506,7 +507,9 @@ const completeQuestIfReady = (guildId, userId, now = Date.now()) => {
     return { completed: false, quest: activeQuest };
   }
 
-  const rewardXp = Number(activeQuest.rewardXp) || 0;
+  const rewardXpBase = Number(activeQuest.rewardXp) || 0;
+  const boostMultiplier = Math.max(1, Number(questXpBoostResolver(guildId, userId)) || 1);
+  const rewardXp = Math.round(rewardXpBase * boostMultiplier);
   const rewardCoins = Number(activeQuest.rewardCoins) || 0;
   const previousQuestXp = Number(userState.questXp) || 0;
   const previousLevel = getQuestLevel(previousQuestXp);
@@ -980,6 +983,74 @@ const formatQuestSummary = (quest) => {
   return `${quest.icon} **${quest.title}** - ${quest.description} (Target: **${targetLabel}**, Reward: **${formatQuestReward(quest)}**)`;
 };
 
+const setQuestXpBoostResolver = (resolver) => {
+  if (typeof resolver === "function") {
+    questXpBoostResolver = resolver;
+    return;
+  }
+
+  questXpBoostResolver = () => 1;
+};
+
+const getQuestCoins = (guildId, userId, now = Date.now()) => {
+  const { userState } = getUserQuestState(guildId, userId, now);
+  return Math.max(0, Number(userState.questCoins || 0));
+};
+
+const addQuestCoins = (guildId, userId, amount, now = Date.now()) => {
+  const safeAmount = Math.floor(Number(amount));
+  if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
+    return { ok: false, reason: "Invalid amount.", balance: getQuestCoins(guildId, userId, now) };
+  }
+
+  const { userState } = getUserQuestState(guildId, userId, now);
+  userState.questCoins = Math.max(0, Number(userState.questCoins || 0)) + safeAmount;
+  saveStore();
+
+  return { ok: true, balance: Number(userState.questCoins || 0) };
+};
+
+const spendQuestCoins = (guildId, userId, amount, now = Date.now()) => {
+  const safeAmount = Math.floor(Number(amount));
+  if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
+    return { ok: false, reason: "Invalid amount.", balance: getQuestCoins(guildId, userId, now) };
+  }
+
+  const { userState } = getUserQuestState(guildId, userId, now);
+  const current = Math.max(0, Number(userState.questCoins || 0));
+  if (current < safeAmount) {
+    return { ok: false, reason: "Not enough quest coins.", balance: current };
+  }
+
+  userState.questCoins = current - safeAmount;
+  saveStore();
+  return { ok: true, balance: Number(userState.questCoins || 0) };
+};
+
+const transferQuestCoins = (guildId, fromUserId, toUserId, amount, now = Date.now()) => {
+  if (!fromUserId || !toUserId || fromUserId === toUserId) {
+    return { ok: false, reason: "Invalid sender/receiver." };
+  }
+
+  const safeAmount = Math.floor(Number(amount));
+  if (!Number.isFinite(safeAmount) || safeAmount <= 0) {
+    return { ok: false, reason: "Invalid amount." };
+  }
+
+  const spendResult = spendQuestCoins(guildId, fromUserId, safeAmount, now);
+  if (!spendResult.ok) {
+    return { ok: false, reason: spendResult.reason, fromBalance: spendResult.balance };
+  }
+
+  const addResult = addQuestCoins(guildId, toUserId, safeAmount, now);
+  return {
+    ok: true,
+    amount: safeAmount,
+    fromBalance: spendResult.balance,
+    toBalance: addResult.balance,
+  };
+};
+
 module.exports = {
   QUEST_PANEL_BUTTON_PREFIX,
   QUEST_TRASH_BUTTON_ID,
@@ -1010,4 +1081,9 @@ module.exports = {
   trashActiveQuest,
   stopVoiceQuestTimer,
   tickVoiceQuestProgress,
+  setQuestXpBoostResolver,
+  getQuestCoins,
+  addQuestCoins,
+  spendQuestCoins,
+  transferQuestCoins,
 };
