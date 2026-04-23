@@ -15,6 +15,9 @@ const MODERATORS = [
     { name: "Sunny", id: "518458685471588386" },
     { name: "Rex", id: "443974289851678731" },
     { name: "Tanishq", id: "779206329813696522" },
+    { name: "Oggy", id: "841202744298962944" },
+    { name: "Hardik", id: "1156853369533648956"},
+    { name: "Anushka", id: "798404080086941717"}
 ];
 
 function randomModName() {
