@@ -186,6 +186,8 @@ const quest = require("./features/quest");
 quest();
 const questShop = require("./features/questShop");
 questShop();
+const storyChallenge = require("./features/storyChallenge");
+storyChallenge();
 const tickets = require("./features/tickets");
 tickets();
 client.login(token).catch((err) => {
