@@ -121,6 +121,8 @@ const getHelpPages = () => {
             `• \`ct lock\` Lock this channel for configured lock roles\n` +
             `• \`ct unlock\` Unlock this channel for configured lock roles\n\n` +
             `🎛️ **Server Tools**\n` +
+            `• </channelbackup:> Save all channel names by channel ID, including voice channels\n` +
+            `• </channelrestore:> Restore saved channel names by channel ID\n` +
             `• \`ct move <from> <to>\` Move VC users\n` +
             `• \`ct announce <text>\` Post announcement in current channel\n` +
             `• \`ct postboymod [text]\` Post boy-mod application panel\n` +
