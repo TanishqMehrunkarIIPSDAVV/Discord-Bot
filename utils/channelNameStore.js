@@ -48,9 +48,22 @@ const saveGuildChannelNames = (guild, channels) => {
         return accumulator;
       }
 
+      // Preserve both the exact original string and a normalized variant.
+      // Some unicode fonts/combining marks can differ in normalization form;
+      // storing both helps ensure we restore the exact appearance users expect.
+      const originalName = typeof channel.name === "string" ? channel.name : String(channel.name || "");
+      const nfcName = (() => {
+        try {
+          return originalName.normalize ? originalName.normalize("NFC") : originalName;
+        } catch {
+          return originalName;
+        }
+      })();
+
       accumulator[channel.id] = {
         id: channel.id,
-        name: channel.name,
+        name: nfcName,
+        originalName: originalName,
         type: channel.type,
         parentId: channel.parentId || null,
       };
