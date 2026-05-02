@@ -27,6 +27,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Client, Collection,GatewayIntentBits,Partials} = require('discord.js');
 const startServer=require("./server");
+const { initializeBot } = require("./botInit");
 
 if (!token) {
     console.error(
@@ -94,6 +95,14 @@ client.on('interactionCreate', async (interaction) => {
             await interaction.reply(errorReply).catch(() => {});
         }
     }
+});
+
+// Initialize MongoDB and data sync on bot ready
+client.once("clientReady", async () => {
+    console.log(`\n✅ Bot connected as ${client.user.tag}`);
+    
+    // Initialize MongoDB support
+    await initializeBot();
 });
 
 startServer();

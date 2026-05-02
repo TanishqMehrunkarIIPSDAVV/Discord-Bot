@@ -1,0 +1,102 @@
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                  MONGODB SETUP - QUICK REFERENCE CARD                    ║
+║                                                                            ║
+║                      🚀 SETUP IN 5 MINUTES 🚀                            ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+1️⃣  GET MONGODB URI
+   https://www.mongodb.com/cloud/atlas/register
+   Create cluster → Create user → Copy connection string
+   
+   Format: mongodb+srv://username:password@cluster.mongodb.net/?retryWrites=true&w=majority
+
+2️⃣  CREATE .env FILE
+   
+   DISCORD_TOKEN=your_bot_token
+   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/?retryWrites=true&w=majority
+
+3️⃣  INSTALL & SETUP
+   
+   npm install
+   node scripts/setupMongoDB.js
+
+4️⃣  START BOT
+   
+   node index.js
+
+───────────────────────────────────────────────────────────────────────────
+
+📁 NEW FILES LOCATIONS
+
+Core:           /utils/db.js, /utils/dataSync.js, /utils/statusMonitor.js
+Scripts:        /scripts/setupMongoDB.js, /scripts/checkStatus.js
+Docs:           /README_MONGODB.md, /SETUP_GUIDE.txt, /QUICK_START.js
+
+───────────────────────────────────────────────────────────────────────────
+
+🛠️  COMMANDS
+
+Check status:
+  node scripts/checkStatus.js
+
+Resync data:
+  node scripts/migrateDataToMongoDB.js
+
+Full setup:
+  node scripts/setupMongoDB.js
+
+Start bot:
+  node index.js
+
+───────────────────────────────────────────────────────────────────────────
+
+💻 CODE USAGE
+
+Load data:
+  const { loadData } = require("./utils/dataSync");
+  const data = await loadData("quest-state", {});
+
+Save data:
+  const { saveData } = require("./utils/dataSync");
+  await saveData("quest-state", data);
+
+Check MongoDB:
+  const { isDatabaseConnected } = require("./utils/db");
+  if (isDatabaseConnected()) console.log("✅");
+
+───────────────────────────────────────────────────────────────────────────
+
+⚠️  REMEMBER
+
+✓ Keep .env file PRIVATE
+✓ Add .env to .gitignore
+✓ Don't share MONGODB_URI
+✓ Data saves to FILES + MongoDB automatically
+✓ Files are primary source
+
+───────────────────────────────────────────────────────────────────────────
+
+📊 WHAT'S SYNCING (11 collections)
+
+✓ afk-state.json
+✓ ai-conversation-history.json
+✓ channel-names.json
+✓ gradient-roles.json
+✓ mod-cases.json
+✓ quest-catalog.json
+✓ quest-shop.json
+✓ quest-state.json
+✓ user-ratings.json
+✓ vc-points.json
+✓ config.json
+
+───────────────────────────────────────────────────────────────────────────
+
+❓ HELP
+
+Setup issues:        See SETUP_GUIDE.txt
+Code examples:       See QUICK_START.js
+How to refactor:     See EXAMPLE_REFACTOR.js
+Complete guide:      See MONGODB_SETUP.md
+
+═══════════════════════════════════════════════════════════════════════════
