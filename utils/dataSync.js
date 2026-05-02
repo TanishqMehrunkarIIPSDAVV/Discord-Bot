@@ -15,10 +15,14 @@ const {
 const DATA_DIR = path.join(__dirname, "..", "data");
 const CONFIG_PATH = path.join(__dirname, "..", "config.json");
 const ROOT_SYNC_FILES = [path.join(__dirname, "..", "scheduledRemovals.json")];
+const DB_SYNC_INTERVAL_MS = 30 * 60 * 1000;
 const watchedFiles = new Set();
 const debounceTimers = new Map();
+const dirtyFiles = new Set();
 let fileWatchersStarted = false;
 let dataDirectoryWatcher = null;
+let dbSyncInterval = null;
+let isSyncInProgress = false;
 
 /**
  * Ensure data directory exists
@@ -39,6 +43,15 @@ function getCollectionFromFilePath(filePath) {
   }
 
   return path.basename(filePath, ".json");
+}
+
+function markFileDirty(filePath) {
+  const collectionName = getCollectionFromFilePath(filePath);
+  if (!collectionName) {
+    return;
+  }
+
+  dirtyFiles.add(filePath);
 }
 
 async function syncFileToMongoDB(filePath) {
@@ -77,10 +90,32 @@ function scheduleMongoSync(filePath) {
 
   const timer = setTimeout(() => {
     debounceTimers.delete(filePath);
-    syncFileToMongoDB(filePath);
+    markFileDirty(filePath);
   }, 150);
 
   debounceTimers.set(filePath, timer);
+}
+
+async function syncDirtyFilesToMongoDB() {
+  if (isSyncInProgress || !isDatabaseConnected() || dirtyFiles.size === 0) {
+    return;
+  }
+
+  isSyncInProgress = true;
+  const pendingFiles = Array.from(dirtyFiles);
+  dirtyFiles.clear();
+
+  console.log(`⏱️  Running scheduled database sync for ${pendingFiles.length} file(s)...`);
+
+  for (const filePath of pendingFiles) {
+    const success = await syncFileToMongoDB(filePath);
+    if (!success) {
+      // Keep failed files queued for the next 30-minute cycle.
+      markFileDirty(filePath);
+    }
+  }
+
+  isSyncInProgress = false;
 }
 
 function watchFileForSync(filePath) {
@@ -136,9 +171,19 @@ function startFileSyncWatchers() {
   for (const filePath of ROOT_SYNC_FILES) {
     watchFileForSync(filePath);
   }
+
+  if (!dbSyncInterval) {
+    dbSyncInterval = setInterval(() => {
+      syncDirtyFilesToMongoDB().catch((error) => {
+        console.error("❌ Scheduled database sync failed:", error.message);
+      });
+    }, DB_SYNC_INTERVAL_MS);
+  }
+
   fileWatchersStarted = true;
 
   console.log("👀 File sync watchers started for JSON files and config.json");
+  console.log("⏱️  Database sync scheduled every 30 minutes (SECONDARY)");
 }
 
 /**
@@ -198,13 +243,15 @@ async function loadData(collectionName, defaultValue = {}) {
 }
 
 /**
- * Save data to both JSON file and MongoDB
+ * Save data to JSON file (PRIMARY).
+ * MongoDB (SECONDARY) sync runs every 30 minutes.
  */
 async function saveData(collectionName, data) {
   ensureDataDir();
   const filePath = path.join(DATA_DIR, `${collectionName}.json`);
 
   const promises = [];
+  let fileSaved = false;
 
   // Save to file
   try {
@@ -215,6 +262,7 @@ async function saveData(collectionName, data) {
             console.error(`❌ Error saving ${collectionName} to file:`, err.message);
           } else {
             console.log(`💾 Saved ${collectionName} to file`);
+            fileSaved = true;
           }
           resolve();
         });
@@ -224,27 +272,18 @@ async function saveData(collectionName, data) {
     console.error(`❌ Error saving ${collectionName} to file:`, error.message);
   }
 
-  // Save to MongoDB
-  if (isDatabaseConnected()) {
-    promises.push(
-      saveDocument(collectionName, { _id: "main" }, data)
-        .then((success) => {
-          if (success) {
-            console.log(`☁️  ${collectionName} - Database updated (SECONDARY)`);
-          }
-        })
-        .catch((error) => {
-          console.error(`❌ Error saving ${collectionName} to MongoDB:`, error.message);
-        })
-    );
-  }
-
-  // Wait for both saves
+  // Wait for file save
   await Promise.all(promises);
+
+  if (fileSaved) {
+    markFileDirty(filePath);
+    console.log(`⏱️  ${collectionName} - Database sync queued (next 30-minute cycle)`);
+  }
 }
 
 /**
- * Batch save multiple data collections (optimized)
+ * Batch save multiple data collections (optimized).
+ * MongoDB (SECONDARY) sync runs every 30 minutes.
  */
 async function batchSaveData(dataMap) {
   ensureDataDir();
@@ -264,21 +303,14 @@ async function batchSaveData(dataMap) {
     }
   );
 
-  // Save to MongoDB in parallel
-  const mongoSavePromises = [];
-  if (isDatabaseConnected()) {
-    Object.entries(dataMap).forEach(([collectionName, data]) => {
-      mongoSavePromises.push(
-        saveDocument(collectionName, { _id: "main" }, data)
-          .catch((error) => {
-            console.error(`❌ Error saving ${collectionName} to MongoDB:`, error.message);
-          })
-      );
-    });
+  await Promise.all(fileSavePromises);
+
+  for (const collectionName of Object.keys(dataMap)) {
+    markFileDirty(path.join(DATA_DIR, `${collectionName}.json`));
   }
 
-  await Promise.all([...fileSavePromises, ...mongoSavePromises]);
-  console.log(`✅ Batch saved ${Object.keys(dataMap).length} collections`);
+  console.log(`✅ Batch saved ${Object.keys(dataMap).length} collections (PRIMARY)`);
+  console.log("⏱️  Database sync queued for next 30-minute cycle (SECONDARY)");
 }
 
 /**
