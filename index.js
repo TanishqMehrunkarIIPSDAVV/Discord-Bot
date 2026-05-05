@@ -107,6 +107,8 @@ client.once("clientReady", async () => {
 
 startServer();
 module.exports=client;
+const inviteBlock = require("./features/inviteBlock");
+inviteBlock(client);
 const binMicWale=require("./features/binMicWale");
 binMicWale();
 //const bump=require("./features/bump");
