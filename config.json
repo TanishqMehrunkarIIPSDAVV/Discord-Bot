@@ -65,5 +65,8 @@
   "questShopCustomRoleAnchorRoleId": "858924540788211723",
   "warnCounts": {
     "714168295854440570": {}
-  }
+  },
+  "messageCoinChannelIds": [
+    "1439523872331534366"
+  ]
 }
