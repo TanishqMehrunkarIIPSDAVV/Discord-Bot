@@ -203,6 +203,8 @@ const storyChallenge = require("./features/storyChallenge");
 storyChallenge();
 const tickets = require("./features/tickets");
 tickets();
+const memberswithout = require("./features/memberswithout");
+memberswithout();
 client.login(token).catch((err) => {
     console.error("Failed to login Discord client:", err?.message || err);
     process.exit(1);
