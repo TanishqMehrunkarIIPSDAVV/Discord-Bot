@@ -49,11 +49,32 @@ const privateVoice = () => {
   const channelToTrusted = new Map();
   const pendingAction = new Map();
 
+  const resolveChannelByIdInGuilds = async (channelId) => {
+    if (!channelId) return null;
+    // Try cache first
+    for (const guild of client.guilds.cache.values()) {
+      const cached = guild.channels.cache.get(channelId);
+      if (cached) return cached;
+    }
+
+    // Try fetching per-guild
+    for (const guild of client.guilds.cache.values()) {
+      try {
+        const fetched = await guild.channels.fetch(channelId).catch(() => null);
+        if (fetched) return fetched;
+      } catch {
+        // ignore
+      }
+    }
+
+    return null;
+  };
+
   const getOwnedChannel = async (ownerId) => {
     const channelId = ownerToChannel.get(ownerId);
     if (!channelId) return null;
 
-    const channel = await client.channels.fetch(channelId).catch(() => null);
+    const channel = await resolveChannelByIdInGuilds(channelId);
     if (!channel) {
       ownerToChannel.delete(ownerId);
       channelToOwner.delete(channelId);
@@ -199,7 +220,7 @@ const privateVoice = () => {
 
   const deletePrivateChannelIfEmpty = async (channelId) => {
     if (!autoDelete) return;
-    const channel = await client.channels.fetch(channelId).catch(() => null);
+    const channel = await resolveChannelByIdInGuilds(channelId);
     if (!channel || channel.type !== ChannelType.GuildVoice) return;
 
     if (channel.members.size > 0) return;
@@ -440,7 +461,7 @@ const privateVoice = () => {
           return;
         }
 
-        const channel = await client.channels.fetch(pending.channelId).catch(() => null);
+        const channel = await resolveChannelByIdInGuilds(pending.channelId);
         if (!channel) {
           pendingAction.delete(interaction.user.id);
           await interaction.reply({ content: "Channel not found.", flags: 64 });

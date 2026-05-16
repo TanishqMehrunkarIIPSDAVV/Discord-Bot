@@ -140,10 +140,17 @@ const confessions = () => {
     try {
       if (!inputChannelId) return;
 
-      const channel = await client.channels
-        .fetch(inputChannelId)
-        .catch(() => null);
-      if (!channel) return;
+      // Resolve the configured input channel only within guilds the bot is in.
+      for (const guild of client.guilds.cache.values()) {
+        let channel = guild.channels.cache.get(inputChannelId);
+        if (!channel) {
+          try {
+            channel = await guild.channels.fetch(inputChannelId);
+          } catch {
+            channel = null;
+          }
+        }
+        if (!channel || channel.type !== 0 /* GuildText */) continue;
 
       const embed = new EmbedBuilder()
         .setTitle("📝 Share Your Confession")
@@ -174,10 +181,13 @@ const confessions = () => {
       if (!confessionMessage) {
         await channel.send({ embeds: [embed], components: [row] }).catch(() => {});
       }
-    } catch (err) {
-      // Silent error handling
     }
-  });
+  }
+  catch
+  {
+    
+  }
+})
 
   // Handle button click
   client.on("interactionCreate", async (interaction) => {
@@ -267,12 +277,26 @@ const confessions = () => {
             return;
           }
 
-          const outputChannel = await client.channels.fetch(outputChannelId).catch(() => null);
+              // Post to the output channel only if it exists in the same guild where the button was clicked
+              const originGuild = interaction.guild;
+              if (!originGuild) {
+                await dmChannel.send("❌ Confessions must be started from a server channel.").catch(() => {});
+                return;
+              }
 
-          if (!outputChannel) {
-            await dmChannel.send("❌ Could not post your confession. Please contact an admin.").catch(() => {});
-            return;
-          }
+              let outputChannel = originGuild.channels.cache.get(outputChannelId);
+              if (!outputChannel) {
+                try {
+                  outputChannel = await originGuild.channels.fetch(outputChannelId);
+                } catch {
+                  outputChannel = null;
+                }
+              }
+
+              if (!outputChannel) {
+                await dmChannel.send("❌ Could not post your confession in this server. Please contact an admin.").catch(() => {});
+                return;
+              }
 
           const embed = new EmbedBuilder()
             .setTitle("Anonymous Confession")
@@ -299,7 +323,18 @@ const confessions = () => {
 
           // Send to admin channel
           if (adminChannelId) {
-            const adminChannel = await client.channels.fetch(adminChannelId).catch(() => null);
+            // Admin channel should also be resolved within the same guild
+            let adminChannel = null;
+            if (adminChannelId) {
+              adminChannel = originGuild.channels.cache.get(adminChannelId);
+              if (!adminChannel) {
+                try {
+                  adminChannel = await originGuild.channels.fetch(adminChannelId);
+                } catch {
+                  adminChannel = null;
+                }
+              }
+            }
             if (adminChannel) {
               const adminEmbed = new EmbedBuilder()
                 .setTitle("📋 Confession Report (Admin)")

@@ -76,9 +76,15 @@ const auditLogs = () => {
   const fetchLogChannel = async (guild, kind) => {
     const id = logIds[kind] || sharedFallback;
     if (!id) return null;
-    const channel =
-      guild.channels.cache.get(id) ||
-      await client.channels.fetch(id).catch(() => null);
+    // Resolve channel only within the guild to avoid posting logs into other servers.
+    let channel = guild.channels.cache.get(id);
+    if (!channel) {
+      try {
+        channel = await guild.channels.fetch(id);
+      } catch (e) {
+        channel = null;
+      }
+    }
     if (!channel) return null;
     const me = guild.members.me;
     if (!me) return null;

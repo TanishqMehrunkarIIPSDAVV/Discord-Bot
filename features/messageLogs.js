@@ -61,12 +61,19 @@ const messageLogs = () => {
       // Avoid logging deletions that happen inside the log channel itself (prevents recursion/spam)
       if (message.channelId === logChannelId) return;
 
-      const logChannel =
-        message.guild.channels.cache.get(logChannelId) ||
-        await client.channels.fetch(logChannelId).catch(() => null);
+      // Resolve the configured channel ID only within the current guild.
+      // Do NOT fall back to `client.channels.fetch` which can return channels from other guilds.
+      let logChannel = message.guild.channels.cache.get(logChannelId);
+      if (!logChannel) {
+        try {
+          logChannel = await message.guild.channels.fetch(logChannelId);
+        } catch (e) {
+          logChannel = null;
+        }
+      }
 
       if (!logChannel) {
-        console.warn("messageLogs: log channel not found:", logChannelId);
+        console.warn("messageLogs: configured log channel is not part of this guild; skipping log", logChannelId);
         return;
       }
 

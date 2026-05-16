@@ -61,6 +61,75 @@ const client = new Client(
 // Allow many feature modules to attach their own listeners without warnings
 client.setMaxListeners(0);
 
+// Wrap event listeners to prevent handler exceptions from crashing the process.
+// Stores original -> wrapped mapping so removeListener/off still works.
+{
+    const listenerMap = new WeakMap();
+    const wrap = (fn) => {
+        if (typeof fn !== 'function') return fn;
+        if (listenerMap.has(fn)) return listenerMap.get(fn);
+        const wrapped = (...args) => {
+            try {
+                const result = fn(...args);
+                if (result && typeof result.then === 'function') {
+                    result.catch((err) => console.error('Async handler error:', err));
+                }
+            } catch (err) {
+                console.error('Event handler error:', err);
+            }
+        };
+        listenerMap.set(fn, wrapped);
+        return wrapped;
+    };
+
+    const origOn = client.on.bind(client);
+    const origAdd = client.addListener ? client.addListener.bind(client) : null;
+    const origOnce = client.once.bind(client);
+    const origPrepend = client.prependListener ? client.prependListener.bind(client) : null;
+    const origRemove = client.removeListener ? client.removeListener.bind(client) : client.off ? client.off.bind(client) : null;
+
+    client.on = (event, listener) => {
+        return origOn(event, wrap(listener));
+    };
+
+    if (origAdd) {
+        client.addListener = (event, listener) => origAdd(event, wrap(listener));
+    }
+
+    client.once = (event, listener) => origOnce(event, wrap(listener));
+
+    if (origPrepend) {
+        client.prependListener = (event, listener) => origPrepend(event, wrap(listener));
+    }
+
+    if (origRemove) {
+        client.removeListener = (event, listener) => origRemove(event, listenerMap.get(listener) || listener);
+        client.off = (event, listener) => origRemove(event, listenerMap.get(listener) || listener);
+    }
+}
+
+// Global process-level handlers to keep the bot running on unexpected errors
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Promise Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+});
+
+process.on('uncaughtExceptionMonitor', (err) => {
+    console.error('Uncaught Exception (monitor):', err);
+});
+
+// Discord client-level error handlers
+client.on('error', (err) => {
+    console.error('Discord client error:', err);
+});
+
+client.on('shardError', (err) => {
+    console.error('Shard error:', err);
+});
+
 client.commands = new Collection();
 
 const commandsPath = path.join(__dirname, 'commands');
@@ -107,104 +176,73 @@ client.once("clientReady", async () => {
 
 startServer();
 module.exports=client;
-const inviteBlock = require("./features/inviteBlock");
-inviteBlock(client);
-const binMicWale=require("./features/binMicWale");
-binMicWale();
-//const bump=require("./features/bump");
-//bump();
-//const distubeFunc=require("./features/distube");
-//distubeFunc();
-//const naam=require("./features/naam");
-//naam();
-const onReady=require("./features/onReady");
-onReady();
-const pingPong=require("./features/pingPong");
-pingPong();
-const spam=require("./features/spam");
-spam();
-const member = require("./features/member");
-member();
-// const speech=require("./features/speech");
-// speech();
-const vcUpdate=require("./features/vcUpdate");
-vcUpdate();
-const vcPoints = require("./features/vcPoints");
-vcPoints();
-const messageCoins = require("./features/messageCoins");
-messageCoins();
-const help=require("./features/help");
-help();
-const info = require("./features/info");
-info();
-const lockChannel = require("./features/lockChannel");
-lockChannel();
-// const tts=require("./features/tts");
-// tts();
-const welcome=require("./features/welcome");
-welcome();
-const kick = require("./features/kick");
-kick();
-const ban = require("./features/ban");
-ban();
-const mute = require("./features/mute");
-mute();
-const warn = require("./features/warn");
-warn();
-const cases = require("./features/cases");
-cases();
-const afk = require("./features/afk");
-afk();
-const unmute = require("./features/unmute");
-unmute();
-const unban = require("./features/unban");
-unban();
-const auditLogs = require("./features/auditLogs");
-auditLogs();
-const messageLogs = require("./features/messageLogs");
-messageLogs();
-const vanity = require("./features/vanity");
-vanity();
-const move = require("./features/move");
-move();
-const voiceDragCases = require("./features/voiceDragCases");
-voiceDragCases();
-const mentionReaction = require("./features/mentionReaction");
-mentionReaction();
-const confessions = require("./features/confessions");
-confessions();
-const complaints = require("./features/complaints");
-complaints();
-const privateVoice = require("./features/privateVoice");
-privateVoice();
-const girlModApplication = require("./features/girlModApplication");
-girlModApplication();
-const boyModApplication = require("./features/boyModApplication");
-boyModApplication();
-const aiReply = require("./features/aiReply");
-aiReply();
-const attachmentOnly = require("./features/attachmentOnly");
-attachmentOnly();
-const chatLore = require("./features/chatLore");
-chatLore();
-const announcement = require("./features/announcement");
-announcement();
-const revivalMentions = require("./features/revivalMentions");
-revivalMentions();
-const userRatings = require("./features/userRatings");
-userRatings();
-const suggestions = require("./features/suggestions");
-suggestions();
-const quest = require("./features/quest");
-quest();
-const questShop = require("./features/questShop");
-questShop();
-const storyChallenge = require("./features/storyChallenge");
-storyChallenge();
-const tickets = require("./features/tickets");
-tickets();
-const memberswithout = require("./features/memberswithout");
-memberswithout();
+// Safe feature loader - prevents a single broken feature from crashing startup
+const safeLoad = (featurePath) => {
+    try {
+        const mod = require(featurePath);
+        if (typeof mod === 'function') {
+            try {
+                mod(client);
+            } catch (err) {
+                console.error(`Feature init failed for ${featurePath}:`, err);
+            }
+        }
+    } catch (err) {
+        console.error(`Failed to require ${featurePath}:`, err);
+    }
+};
+
+// Load features safely
+safeLoad("./features/inviteBlock");
+safeLoad("./features/binMicWale");
+//safeLoad("./features/bump");
+//safeLoad("./features/distube");
+//safeLoad("./features/naam");
+safeLoad("./features/onReady");
+safeLoad("./features/pingPong");
+safeLoad("./features/spam");
+safeLoad("./features/member");
+//safeLoad("./features/speech");
+safeLoad("./features/vcUpdate");
+safeLoad("./features/vcPoints");
+safeLoad("./features/messageCoins");
+safeLoad("./features/help");
+safeLoad("./features/info");
+safeLoad("./features/lockChannel");
+//safeLoad("./features/tts");
+safeLoad("./features/welcome");
+safeLoad("./features/kick");
+safeLoad("./features/ban");
+safeLoad("./features/mute");
+safeLoad("./features/warn");
+safeLoad("./features/cases");
+safeLoad("./features/afk");
+safeLoad("./features/unmute");
+safeLoad("./features/unban");
+safeLoad("./features/auditLogs");
+safeLoad("./features/messageLogs");
+safeLoad("./features/vanity");
+safeLoad("./features/move");
+safeLoad("./features/voiceDragCases");
+safeLoad("./features/mentionReaction");
+safeLoad("./features/confessions");
+safeLoad("./features/complaints");
+safeLoad("./features/privateVoice");
+safeLoad("./features/girlModApplication");
+safeLoad("./features/boyModApplication");
+safeLoad("./features/aiReply");
+safeLoad("./features/attachmentOnly");
+safeLoad("./features/chatLore");
+safeLoad("./features/announcement");
+safeLoad("./features/revivalMentions");
+safeLoad("./features/userRatings");
+safeLoad("./features/suggestions");
+safeLoad("./features/guildInventory");
+safeLoad("./features/quest");
+safeLoad("./features/questShop");
+safeLoad("./features/storyChallenge");
+safeLoad("./features/tickets");
+safeLoad("./features/memberswithout");
 client.login(token).catch((err) => {
     console.error("Failed to login Discord client:", err?.message || err);
     process.exit(1);

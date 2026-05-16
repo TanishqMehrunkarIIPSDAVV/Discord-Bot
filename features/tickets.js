@@ -229,9 +229,17 @@ const sendTicketTranscript = async ({ guild, channel, closedByUser, runtimeConfi
   const transcriptBuffer = Buffer.from(transcriptText, "utf8");
 
   if (runtimeConfig.transcriptChannelId) {
-    const transcriptChannel = await client.channels.fetch(runtimeConfig.transcriptChannelId).catch(() => null);
+    // Resolve transcript channel within the same guild
+    let transcriptChannel = guild.channels.cache.get(runtimeConfig.transcriptChannelId) || null;
+    if (!transcriptChannel) {
+      try {
+        transcriptChannel = await guild.channels.fetch(runtimeConfig.transcriptChannelId);
+      } catch {
+        transcriptChannel = null;
+      }
+    }
     if (!transcriptChannel || !transcriptChannel.isTextBased()) {
-      console.warn("tickets: transcript channel not found or not text-based:", runtimeConfig.transcriptChannelId);
+      console.warn("tickets: transcript channel not found or not text-based in this guild:", runtimeConfig.transcriptChannelId);
     } else {
       const channelAttachment = new AttachmentBuilder(transcriptBuffer, {
         name: `ticket-${channel.name}-${Date.now()}.txt`,
@@ -450,14 +458,24 @@ const tickets = () => {
         console.warn("tickets: panel channel ID not configured");
         return;
       }
-
-      const panelChannel = await client.channels.fetch(runtimeConfig.panelChannelId).catch(() => null);
-      if (!panelChannel || panelChannel.type !== ChannelType.GuildText) {
-        console.warn("tickets: panel channel not found or invalid:", runtimeConfig.panelChannelId);
-        return;
+      // Resolve the panel channel only within guilds the bot is a member of
+      let found = false;
+      for (const guild of client.guilds.cache.values()) {
+        let panelChannel = guild.channels.cache.get(runtimeConfig.panelChannelId) || null;
+        if (!panelChannel) {
+          try {
+            panelChannel = await guild.channels.fetch(runtimeConfig.panelChannelId);
+          } catch {
+            panelChannel = null;
+          }
+        }
+        if (!panelChannel || panelChannel.type !== ChannelType.GuildText) continue;
+        await ensureTicketPanelMessage(panelChannel);
+        found = true;
       }
-
-      await ensureTicketPanelMessage(panelChannel);
+      if (!found) {
+        console.warn("tickets: panel channel not found or invalid in any guild:", runtimeConfig.panelChannelId);
+      }
     } catch (error) {
       console.error("tickets ready error:", error);
     }

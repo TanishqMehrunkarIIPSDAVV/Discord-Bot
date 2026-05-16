@@ -40,10 +40,23 @@ const suggestions = () => {
 
       if (!buttonChannelId) return;
 
-      const buttonChannel = await client.channels.fetch(buttonChannelId).catch(() => null);
-      if (!buttonChannel || buttonChannel.type !== ChannelType.GuildText) return;
-
-      await ensureSuggestionPanelMessage(buttonChannel, client.user.id);
+      // Resolve channel within the guilds the bot is in
+      let buttonChannel = null;
+      for (const guild of client.guilds.cache.values()) {
+        buttonChannel = guild.channels.cache.get(buttonChannelId) || null;
+        if (!buttonChannel) {
+          try {
+            buttonChannel = await guild.channels.fetch(buttonChannelId);
+          } catch {
+            buttonChannel = null;
+          }
+        }
+        if (buttonChannel && buttonChannel.type === ChannelType.GuildText) {
+          await ensureSuggestionPanelMessage(buttonChannel, client.user.id);
+          break;
+        }
+        buttonChannel = null;
+      }
     } catch (error) {
       console.error("suggestions ready error:", error);
     }
@@ -110,7 +123,20 @@ const suggestions = () => {
         });
       }
 
-      const postChannel = await client.channels.fetch(postChannelId).catch(() => null);
+      // Ensure the post channel belongs to the same guild where the interaction occurred
+      const originGuild = interaction.guild;
+      if (!originGuild) {
+        return interaction.editReply({ content: "Suggestions must be submitted from a server." });
+      }
+
+      let postChannel = originGuild.channels.cache.get(postChannelId) || null;
+      if (!postChannel) {
+        try {
+          postChannel = await originGuild.channels.fetch(postChannelId);
+        } catch {
+          postChannel = null;
+        }
+      }
       if (!postChannel || postChannel.type !== ChannelType.GuildText) {
         return interaction.editReply({
           content:
