@@ -5,19 +5,20 @@ const MIN_ACTIVITY_REFRESH_MS = 60_000;
 const MAX_ACTIVITY_REFRESH_MS = 120_000;
 let activityRefreshTimer = null;
 const MODERATORS = [
-    { name: "Navya", id: "1358018305537085570" },
+    //{ name: "Navya", id: "1358018305537085570" },
     { name: "Bella", id: "1462895979052269890" },
     { name: "Aditya", id: "508215254497624084" },
-    { name: "Deep", id: "308232106562158593" },
+    //{ name: "Deep", id: "308232106562158593" },
     { name: "Dizzi", id: "936125585711845437" },
-    { name: "Rave", id: "1217740773173235774" },
-    { name: "Jay", id: "403132421765070848" },
+    //{ name: "Rave", id: "1217740773173235774" },
+    //{ name: "Jay", id: "403132421765070848" },
     { name: "Sunny", id: "518458685471588386" },
     { name: "Rex", id: "443974289851678731" },
     { name: "Tanishq", id: "779206329813696522" },
-    { name: "Oggy", id: "841202744298962944" },
+    //{ name: "Oggy", id: "841202744298962944" },
     { name: "Hardik", id: "1156853369533648956"},
-    { name: "Anushka", id: "798404080086941717"}
+    { name: "Prerna", id: "915303582398554172"},
+    //{ name: "Anushka", id: "798404080086941717"}
 ];
 
 function randomModName() {
