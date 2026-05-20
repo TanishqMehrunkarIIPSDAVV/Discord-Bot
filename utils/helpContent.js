@@ -179,6 +179,7 @@ const getHelpPages = () => {
             `🔊 **Other Active Systems**\n` +
             `• Private VC trigger: ${privateVcTriggerChannel}\n` +
             `• AI reply channels: ${aiReplyChannels}\n` +
+            `• In DMs, allowed users can use \`/ai prompt:<message>\` to start an AI chat\n` +
             `• Verification flow channel: ${verifyChannel}\n` +
             `• Welcome/leave embeds, spam auto-timeout, revival pings, ping/pong, vanity and voice-role sync are active.`
         )
