@@ -56,7 +56,7 @@ function buildWrongInputMessage(message, result, reason) {
   const channelWarnings = Number(result.channelWarnings) || 0;
 
   if (result.usedSave) {
-    return `${userMention(message.author.id)} broke the count (${reason}). Count reset to **1**. Channel warning #${channelWarnings}. A save was used, so no personal warning was issued. Remaining saves: **${userState.saves}**.`;
+    return `${userMention(message.author.id)} broke the count (${reason}). A save was used so the current count was preserved. Channel warning #${channelWarnings}. Remaining saves: **${userState.saves}**.`;
   }
 
   return `${userMention(message.author.id)} broke the count (${reason}). Count reset to **1**. Channel warning #${channelWarnings}. Personal warning #${userState.warnings}. Next expected number is **1**.`;

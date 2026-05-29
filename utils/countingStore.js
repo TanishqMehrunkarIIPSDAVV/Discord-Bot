@@ -142,14 +142,17 @@ const recordWrongCount = (guildId, channelId, userId) => {
   const channelState = ensureChannelState(guildId, channelId);
   const userState = ensureUserState(channelState, userId);
 
+  // Always increment a channel-level warning when a wrong input occurs
   channelState.warnings += 1;
-  channelState.count = "0";
-  channelState.lastUserId = null;
 
   const hadSave = userState.saves > 0;
   if (hadSave) {
+    // Consume a save but preserve the current channel count and last user
     userState.saves -= 1;
   } else {
+    // No save available: reset the channel count and add a personal warning
+    channelState.count = "0";
+    channelState.lastUserId = null;
     userState.warnings += 1;
   }
 
