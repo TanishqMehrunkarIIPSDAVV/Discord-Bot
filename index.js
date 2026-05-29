@@ -215,6 +215,7 @@ safeLoad("./features/kick");
 safeLoad("./features/ban");
 safeLoad("./features/mute");
 safeLoad("./features/warn");
+safeLoad("./features/counting");
 safeLoad("./features/cases");
 safeLoad("./features/afk");
 safeLoad("./features/unmute");
