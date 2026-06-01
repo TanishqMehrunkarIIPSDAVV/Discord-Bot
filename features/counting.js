@@ -81,17 +81,16 @@ const counting = () => {
       const content = (message.content || "").trim();
       if (!content) return;
 
+      // Only act on messages that start with a number; ignore everything else.
+      const leading = content.match(/^(\d+)/);
+      if (!leading) return; // message doesn't start with a number => ignore
+
+      const numberStr = leading[1];
+
       const channelState = getChannelSnapshot(message.guild.id, message.channelId);
       const expectedNumber = channelState.count + 1n;
 
-      if (!/^\d+$/.test(content)) {
-        const result = recordWrongCount(message.guild.id, message.channelId, message.author.id);
-        const response = buildWrongInputMessage(message, result, "only numbers are allowed");
-        try { await message.react('❌'); } catch {}
-        return message.channel.send(response);
-      }
-
-      const submittedNumber = BigInt(content);
+      const submittedNumber = BigInt(numberStr);
       if (submittedNumber <= 0n) {
         const result = recordWrongCount(message.guild.id, message.channelId, message.author.id);
         const response = buildWrongInputMessage(message, result, "the number must be at least 1");
