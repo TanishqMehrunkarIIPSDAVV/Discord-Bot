@@ -87,6 +87,7 @@ const getHelpPages = () => {
             `🔊 **Voice & Moderation**\n` +
             `• </removeme:> Schedule VC removal\n` +
             `• </vcguard:> Enable/disable VC guard\n` +
+            `• </vcaccess:> Manage protected VC access and allow list\n` +
             `• </quest:> Show quest board, stats, history, leaderboard, or trash active quest\n` +
             `• </questadmin refresh:> Admin-only quest cycle refresh\n` +
             `• </vcpoints:> Show VC points for you or a user\n` +

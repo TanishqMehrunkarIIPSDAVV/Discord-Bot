@@ -11,6 +11,10 @@ const {
   TextInputStyle,
   UserSelectMenuBuilder,
 } = require("discord.js");
+const {
+  getAllowedUserIds,
+  getProtectedVoiceChannelId,
+} = require("../utils/privateVoiceAccessStore");
 
 let registered = false;
 
@@ -48,6 +52,11 @@ const privateVoice = () => {
   const channelToOwner = new Map();
   const channelToTrusted = new Map();
   const pendingAction = new Map();
+
+  const isUserAllowedInProtectedVoice = (userId) => {
+    const allowedIds = getAllowedUserIds();
+    return allowedIds.has(String(userId).trim());
+  };
 
   const resolveChannelByIdInGuilds = async (channelId) => {
     if (!channelId) return null;
@@ -232,8 +241,74 @@ const privateVoice = () => {
     channelToTrusted.delete(channelId);
   };
 
+  const syncProtectedVoiceChannel = async (channel) => {
+    if (!channel || !channel.isVoiceBased?.()) return;
+
+    const allowedIds = getAllowedUserIds();
+    const botId = channel.guild.members.me?.id || client.user.id;
+
+    await channel.permissionOverwrites.edit(channel.guild.id, {
+      ViewChannel: true,
+      Connect: false,
+    }).catch(() => {});
+
+    for (const overwrite of channel.permissionOverwrites.cache.values()) {
+      if (overwrite.id === channel.guild.id) continue;
+      if (overwrite.id === botId) continue;
+      if (channel.guild.roles.cache.has(overwrite.id)) continue;
+      if (allowedIds.has(overwrite.id)) continue;
+      await channel.permissionOverwrites.delete(overwrite.id).catch(() => {});
+    }
+
+    await channel.permissionOverwrites.edit(botId, {
+      ViewChannel: true,
+      Connect: true,
+      Speak: true,
+      ManageChannels: true,
+      MoveMembers: true,
+    }).catch(() => {});
+
+    for (const userId of allowedIds) {
+      await channel.permissionOverwrites.edit(userId, {
+        ViewChannel: true,
+        Connect: true,
+      }).catch(() => {});
+    }
+  };
+
+  const disconnectUnauthorizedMembers = async (channel) => {
+    if (!channel?.members) return;
+
+    for (const member of channel.members.values()) {
+      if (member.user?.bot) continue;
+      if (isUserAllowedInProtectedVoice(member.id)) continue;
+      await member.voice.setChannel(null).catch(() => {});
+    }
+  };
+
+  const bootstrapProtectedVoiceChannel = async () => {
+    const protectedChannelId = getProtectedVoiceChannelId();
+    if (!protectedChannelId) return;
+
+    const channel = await resolveChannelByIdInGuilds(protectedChannelId);
+    if (!channel || !channel.isVoiceBased?.()) return;
+
+    await syncProtectedVoiceChannel(channel);
+    await disconnectUnauthorizedMembers(channel);
+  };
+
+  bootstrapProtectedVoiceChannel().catch(() => {});
+
   client.on("voiceStateUpdate", async (oldState, newState) => {
     try {
+      const protectedChannelId = getProtectedVoiceChannelId();
+      if (protectedChannelId && newState.channelId === protectedChannelId) {
+        if (!newState.member?.user?.bot && !isUserAllowedInProtectedVoice(newState.id)) {
+          await newState.setChannel(null).catch(() => {});
+          return;
+        }
+      }
+
       if (newState.channelId === triggerChannelId) {
         const created = await createPrivateChannel(newState);
         if (created) {
