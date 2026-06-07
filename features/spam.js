@@ -72,7 +72,8 @@ const spam = () => {
         if(message.channel.id === "1439573831831392428" ||
             message.channel.id === "1439536650123476992" ||
             message.channel.id === "941243940915515392" ||
-            message.channel.id === "941244061162033152"
+            message.channel.id === "941244061162033152" ||
+            message.channel.id === "1509982652453621780"
         ) return;
         if (message.author.bot && message.author.id !== client.user?.id) return;
         

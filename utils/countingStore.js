@@ -138,7 +138,7 @@ const recordCorrectCount = (guildId, channelId, userId) => {
   };
 };
 
-const recordWrongCount = (guildId, channelId, userId) => {
+const recordWrongCount = (guildId, channelId, userId, resetCount = 0n) => {
   const channelState = ensureChannelState(guildId, channelId);
   const userState = ensureUserState(channelState, userId);
 
@@ -150,8 +150,19 @@ const recordWrongCount = (guildId, channelId, userId) => {
     // Consume a save but preserve the current channel count and last user
     userState.saves -= 1;
   } else {
-    // No save available: reset the channel count and add a personal warning
-    channelState.count = "0";
+    // No save available: reset the channel count to the previous checkpoint and add a personal warning
+    let safeResetCount = 0n;
+    try {
+      safeResetCount = BigInt(resetCount);
+    } catch {
+      safeResetCount = 0n;
+    }
+
+    if (safeResetCount < 0n) {
+      safeResetCount = 0n;
+    }
+
+    channelState.count = safeResetCount.toString();
     channelState.lastUserId = null;
     userState.warnings += 1;
   }
@@ -163,6 +174,7 @@ const recordWrongCount = (guildId, channelId, userId) => {
     userWarnings: userState.warnings,
     remainingSaves: userState.saves,
     usedSave: hadSave,
+    resetCount: hadSave ? BigInt(channelState.count || "0") : BigInt(channelState.count || "0"),
   };
 };
 
