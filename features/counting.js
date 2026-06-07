@@ -126,6 +126,26 @@ const counting = () => {
           `${message.author} earned **${savesEarned}** save${savesEarned === 1 ? "" : "s"}. Total saves: **${totalSaves}**.`
         );
       }
+      // Announce milestones (configurable via config.json -> countingMilestones)
+      try {
+        const config = loadConfig();
+        const defaultMilestones = [50, 100, 200, 500, 1000];
+        const milestones = Array.isArray(config.countingMilestones)
+          ? config.countingMilestones.map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0)
+          : defaultMilestones;
+
+        for (const m of milestones) {
+          if (BigInt(m) === result.count) {
+                const announceChannel = message.channel; // always announce in the counting channel
+                const countStr = formatBigInt(result.count);
+                const announcement = `🎉 Milestone reached: **${countStr}** in ${announceChannel}! Congratulations ${message.author}!`;
+                try { await announceChannel.send(announcement); } catch {}
+            break;
+          }
+        }
+      } catch (err) {
+        // don't let announcement errors interrupt counting
+      }
     } catch (error) {
       console.error("counting feature error:", error);
     }
