@@ -11,16 +11,16 @@ const LEADERBOARD_TIMEFRAMES = Object.freeze({
 });
 
 const MILESTONES = [
-  { points: 50, name: "🎧 ✦ 𝐕𝐂 𝐍𝐄𝐖𝐁𝐈𝐄 ✦ 🎧", roleId: "1491883856083550228" },
-  { points: 100, name: "💬 ✦ 𝐕𝐂 𝐋𝐈𝐒𝐓𝐄𝐍𝐄𝐑 ✦ 💬", roleId: "1491884162905280662" },
-  { points: 200, name: "🎙️ ✦ 𝐕𝐂 𝐑𝐄𝐆𝐔𝐋𝐀𝐑 ✦ 🎙️", roleId: "1491884351711875082" },
-  { points: 400, name: "🔥 ✦ 𝐀𝐃𝐃𝐀 𝐀𝐂𝐓𝐈𝐕𝐄 ✦ 🔥", roleId: "1491884436399194373" },
-  { points: 1000, name: "⚡ ✦ 𝐕𝐂 𝐏𝐑𝐎 ✦ ⚡", roleId: "1491884535955198012" },
-  { points: 2000, name: "💫 ✦ 𝐓𝐀𝐏𝐑𝐈 𝐕𝐈𝐁𝐄𝐑 ✦ 💫", roleId: "1491884706667696188" },
-  { points: 4000, name: "👑 ✦ 𝐀𝐃𝐃𝐀 𝐒𝐓𝐀𝐑 ✦ 👑", roleId: "1491884784677290168" },
-  { points: 8500, name: "💎 ✦ 𝐕𝐂 𝐄𝐋𝐈𝐓𝐄 ✦ 💎", roleId: "1491884879808299088" },
-  { points: 10000, name: "🌟 ✦ 𝐓𝐀𝐏𝐑𝐈 𝐋𝐄𝐆𝐄𝐍𝐃 ✦ 🌟", roleId: "1491885038189674567" },
-  { points: 35000, name: "🚀 ✦ 𝐀𝐃𝐃𝐀 𝐈𝐂𝐎𝐍 ✦ 🚀", roleId: "1491885111652646933" },
+  { points: 50, name: "50   ✦ Star Seeker", roleId: "1524401901914034329" },
+  { points: 100, name: "100   ✦ Starlight Acolyte", roleId: "1524401800176865290" },
+  { points: 200, name: "200   ✦ Lunar Envoy", roleId: "1524401754719125565" },
+  { points: 400, name: "400   ✦ Astral Adept", roleId: "1524401693566173265" },
+  { points: 1000, name: "1000   ✦ Celestial Keeper", roleId: "1524401636066459659" },
+  { points: 2000, name: "2000   ✦ Nebula Sage", roleId: "1524401565031727256" },
+  { points: 4000, name: "4000   ✦ Cosmic Warden", roleId: "1524401490075320410" },
+  { points: 8500, name: "8500   ✦ Phantom Vanguard", roleId: "1524401425256284300" },
+  { points: 10000, name: "10000   ✦ Stellar Champion", roleId: "1524401380159393914" },
+  { points: 35000, name: "35000  ✦ Ethereal Monarch", roleId: "1524401336202825748" },
 ];
 
 let cache = null;
