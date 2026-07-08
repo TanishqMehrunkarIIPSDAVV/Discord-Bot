@@ -122,12 +122,10 @@ File Name                        → MongoDB Collection
 afk-state.json                   → afk-state
 ai-conversation-history.json     → ai-conversation-history
 channel-names.json               → channel-names
-gradient-roles.json              → gradient-roles
 mod-cases.json                   → mod-cases
 quest-catalog.json               → quest-catalog
 quest-shop.json                  → quest-shop
 quest-state.json                 → quest-state
-user-ratings.json                → user-ratings
 vc-points.json                   → vc-points
 config.json                      → bot-config
 

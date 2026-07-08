@@ -72,9 +72,6 @@ const getHelpPages = () => {
             `• </user:> Show user info\n` +
             `• </server:> Show server info\n` +
             `• </prune:> Delete 1-99 messages\n\n` +
-            `🎨 **Gradient Roles**\n` +
-            `• </gradientrole:> Create or reuse your gradient role from two hex colors\n` +
-            `• Same gradient input reuses the existing role instead of making a duplicate\n\n` +
             `🎭 **Fun / Utility**\n` +
             `• </die:> Cringe reaction GIF\n` +
             `• </options-info:> Echo input\n` +
@@ -82,7 +79,6 @@ const getHelpPages = () => {
             `• </punch:> Punch a user\n` +
             `• </slap:> Slap a user\n` +
             `• </lore:> Summarize tracked chat history and explain what happened\n` +
-            `• </ratings:> View a user's peer rating summary\n` +
             `• </test:> Testing command\n\n` +
             `🔊 **Voice & Moderation**\n` +
             `• </removeme:> Schedule VC removal\n` +

@@ -52,16 +52,14 @@ node index.js
 
 ## 🎯 What's Synced
 
-All 11 data collections automatically sync to MongoDB:
+All 10 data collections automatically sync to MongoDB:
 - ✅ afk-state.json
 - ✅ ai-conversation-history.json
 - ✅ channel-names.json
-- ✅ gradient-roles.json
 - ✅ mod-cases.json
 - ✅ quest-catalog.json
 - ✅ quest-shop.json
 - ✅ quest-state.json
-- ✅ user-ratings.json
 - ✅ vc-points.json
 - ✅ config.json
 

@@ -84,12 +84,10 @@ The following JSON files are automatically synced to MongoDB:
 - `data/afk-state.json` → Collection: `afk-state`
 - `data/ai-conversation-history.json` → Collection: `ai-conversation-history`
 - `data/channel-names.json` → Collection: `channel-names`
-- `data/gradient-roles.json` → Collection: `gradient-roles`
 - `data/mod-cases.json` → Collection: `mod-cases`
 - `data/quest-catalog.json` → Collection: `quest-catalog`
 - `data/quest-shop.json` → Collection: `quest-shop`
 - `data/quest-state.json` → Collection: `quest-state`
-- `data/user-ratings.json` → Collection: `user-ratings`
 - `data/vc-points.json` → Collection: `vc-points`
 - `config.json` → Collection: `bot-config`
 
@@ -178,7 +176,6 @@ if (collection) {
 const { getDocument, getDocuments } = require("./utils/db");
 
 // Get single document
-const doc = await getDocument("user-ratings", { _id: "main" });
 
 // Get multiple documents
 const docs = await getDocuments("quest-state", { userId: "123" });

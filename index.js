@@ -236,7 +236,6 @@ safeLoad("./features/attachmentOnly");
 safeLoad("./features/chatLore");
 safeLoad("./features/announcement");
 safeLoad("./features/revivalMentions");
-safeLoad("./features/userRatings");
 safeLoad("./features/suggestions");
 safeLoad("./features/guildInventory");
 safeLoad("./features/quest");

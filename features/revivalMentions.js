@@ -3,8 +3,6 @@ const client = require(`${path.dirname(__dirname)}/index.js`);
 const config = require("../config.json");
 const { PermissionFlagsBits } = require("discord.js");
 
-const CHAT_REVIVAL_NAME = "chat revival";
-const VC_REVIVAL_NAME = "vc revival";
 const CHAT_TRIGGER_REGEX = /^(?:chat\s+revival|arise\s+chat)$/i;
 const VC_TRIGGER_REGEX = /^(?:vc\s+revival|arise\s+vc)$/i;
 
@@ -17,10 +15,9 @@ const VC_REVIVAL_ROLE_ID = String(
 
 let rolesHydrated = false;
 
-function isTargetRole(role, expectedId, expectedName) {
+function isTargetRole(role, expectedId) {
   if (!role) return false;
-  if (expectedId && role.id === expectedId) return true;
-  return role.name.toLowerCase() === expectedName;
+  return Boolean(expectedId) && role.id === expectedId;
 }
 
 function getTriggerRequests(content) {
@@ -33,10 +30,10 @@ function getTriggerRequests(content) {
 async function resolveTargetRoles(guild) {
   const roles = [...guild.roles.cache.values()];
   const chatRole = roles.find((role) =>
-    isTargetRole(role, CHAT_REVIVAL_ROLE_ID, CHAT_REVIVAL_NAME)
+    isTargetRole(role, CHAT_REVIVAL_ROLE_ID)
   );
   const vcRole = roles.find((role) =>
-    isTargetRole(role, VC_REVIVAL_ROLE_ID, VC_REVIVAL_NAME)
+    isTargetRole(role, VC_REVIVAL_ROLE_ID)
   );
   return { chatRole, vcRole };
 }
@@ -111,10 +108,10 @@ function revivalMentions() {
     const { wantsChat, wantsVc } = getTriggerRequests(message.content || "");
     const mentionedRoles = message.mentions?.roles ? [...message.mentions.roles.values()] : [];
     const mentionsChatRevival = mentionedRoles.some((role) =>
-      isTargetRole(role, CHAT_REVIVAL_ROLE_ID, CHAT_REVIVAL_NAME)
+      isTargetRole(role, CHAT_REVIVAL_ROLE_ID)
     );
     const mentionsVcRevival = mentionedRoles.some((role) =>
-      isTargetRole(role, VC_REVIVAL_ROLE_ID, VC_REVIVAL_NAME)
+      isTargetRole(role, VC_REVIVAL_ROLE_ID)
     );
 
     const requestChat = wantsChat || mentionsChatRevival;

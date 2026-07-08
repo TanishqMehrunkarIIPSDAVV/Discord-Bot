@@ -108,12 +108,10 @@ These JSON files are now synced to MongoDB:
 afk-state                  → Collection: afk-state
 ai-conversation-history    → Collection: ai-conversation-history
 channel-names             → Collection: channel-names
-gradient-roles            → Collection: gradient-roles
 mod-cases                 → Collection: mod-cases
 quest-catalog             → Collection: quest-catalog
 quest-shop                → Collection: quest-shop
 quest-state               → Collection: quest-state
-user-ratings              → Collection: user-ratings
 vc-points                 → Collection: vc-points
 config.json               → Collection: bot-config
 */

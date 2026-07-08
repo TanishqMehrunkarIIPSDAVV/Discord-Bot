@@ -228,12 +228,10 @@ All 11 collections automatically sync:
 1. afk-state                    → User AFK statuses
 2. ai-conversation-history      → AI reply conversations
 3. channel-names                → Custom channel names
-4. gradient-roles               → Gradient role data
 5. mod-cases                    → Moderation cases
 6. quest-catalog                → Available quests
 7. quest-shop                   → Quest shop items
 8. quest-state                  → User quest progress
-9. user-ratings                 → User rating data
 10. vc-points                   → Voice channel points
 11. bot-config                  → Config.json data
 

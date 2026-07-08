@@ -210,11 +210,9 @@ async function createIndexes() {
   try {
     // Create indexes for common queries
     const collections = {
-      "user-ratings": [{ key: "participants" }],
       "quest-state": [{ key: "userId" }, { key: "guildId" }],
       "vc-points": [{ key: "userId" }, { key: "guildId" }],
       "mod-cases": [{ key: "userId" }, { key: "guildId" }],
-      "gradient-roles": [{ key: "userId" }],
       "channel-names": [{ key: "channelId" }],
     };
 

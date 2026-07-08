@@ -51,12 +51,10 @@ async function setupMongoDB() {
     "afk-state",
     "ai-conversation-history",
     "channel-names",
-    "gradient-roles",
     "mod-cases",
     "quest-catalog",
     "quest-shop",
     "quest-state",
-    "user-ratings",
     "vc-points",
     "bot-config",
   ];
