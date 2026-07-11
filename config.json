@@ -37,6 +37,9 @@
     "810847232047448104",
     "1259530981526868048"
   ],
+  "inviteBlockExcludedChannelIds": [
+    "1525540789122367598"
+  ],
   "vcAutoDisconnectEnabled": false,
   "ticketPanelChannelId": "1493239079272190142",
   "ticketCategoryId": "1493238860971511920",
