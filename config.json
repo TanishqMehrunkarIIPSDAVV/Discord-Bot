@@ -15,12 +15,29 @@
   "complaintDisplayChannelId": "1473331541584379974",
   "complaintAdminChannelId": "1473331580972961905",
   "complaintCategoryId": "1473330861406421136",
-  "complaintVcModRoleIds": ["1488125416450424935"],
-  "complaintChatModRoleIds": ["1488554940161982585"],
-  "complaintHeadModRoleIds": ["1488121128361656330"],
-  "complaintAdminRoleIds": ["1439971904260800618"],
+  "complaintVcModRoleIds": [
+    "1488125416450424935"
+  ],
+  "complaintChatModRoleIds": [
+    "1488554940161982585"
+  ],
+  "complaintHeadModRoleIds": [
+    "1488121128361656330"
+  ],
+  "complaintAdminRoleIds": [
+    "1439971904260800618"
+  ],
   "suggestionButtonChannelId": "1491921404298395748",
   "suggestionPostChannelId": "1491921828359180380",
+  "confessionAdminChannelId": "1473348273111568455",
+  "privateVcTriggerChannelId": "1473620278759133194",
+  "privateVcProtectedChannelId": "1512727135473897612",
+  "privateVcAllowedUserIds": [
+    "779206329813696522",
+    "810847232047448104",
+    "1259530981526868048"
+  ],
+  "vcAutoDisconnectEnabled": false,
   "ticketPanelChannelId": "1493239079272190142",
   "ticketCategoryId": "1493238860971511920",
   "ticketTranscriptChannelId": "1493239438514458844",
@@ -29,20 +46,15 @@
     "1488121128361656330"
   ],
   "ticketSupportRoleIds": [],
-  "confessionAdminChannelId": "1473348273111568455",
-  "privateVcTriggerChannelId": "1473620278759133194",
-  "privateVcProtectedChannelId": "1512727135473897612",
-  "privateVcAllowedUserIds": [
-    "779206329813696522",
-    "810847232047448104"
-  ],
-  "vcAutoDisconnectEnabled": true,
   "blockedVcUserIds": [
     "1431614444407885824",
-    "986665797499908196"
+    "986665797499908196",
+    "1444214887403229194",
+    "708627792580968500"
   ],
   "aiReplyChannelIds": [
-    "1488558127736426527"
+    "1488558127736426527",
+    "1524399548116631764"
   ],
   "attachmentOnlyChannelIds": [
     "1493694673443749949",
@@ -61,7 +73,21 @@
     "1439523872331534366"
   ],
   "milestoneAnnounceChannelId": "1439523872331534366",
-  "countingCheckpoints": [50, 100, 200, 500, 1000,2000, 5000, 10000, 20000, 50000, 100000, 200000, 500000],
+  "countingCheckpoints": [
+    50,
+    100,
+    200,
+    500,
+    1000,
+    2000,
+    5000,
+    10000,
+    20000,
+    50000,
+    100000,
+    200000,
+    500000
+  ],
   "questShopChannelId": "1495851120491495505",
   "questShopPremiumRole1Id": "1495836381447061618",
   "questShopPremiumRole2Id": "1495836569276256468",
@@ -70,7 +96,17 @@
   "storyChallengeChannelId": "1498427051789779044",
   "questShopCustomRoleAnchorRoleId": "858924540788211723",
   "warnCounts": {
-    "714168295854440570": {}
+    "714168295854440570": {
+      "1458822577119039550": 1,
+      "1039878621701079110": 1,
+      "1484396132607197306": 1,
+      "841202744298962944": 2,
+      "676736767923060763": 1,
+      "1369928093573185567": 1,
+      "1156853369533648956": 3,
+      "1420704525991546974": 1,
+      "737323652223074394": 1
+    }
   },
   "messageCoinChannelIds": [
     "1439523872331534366"
