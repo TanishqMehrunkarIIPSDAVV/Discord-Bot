@@ -123,8 +123,8 @@ const recordCorrectCount = (guildId, channelId, userId) => {
   userState.progress += 1;
 
   let savesEarned = 0;
-  while (userState.progress >= 100) {
-    userState.progress -= 100;
+  while (userState.progress >= 50) {
+    userState.progress -= 50;
     userState.saves += 1;
     savesEarned += 1;
   }
