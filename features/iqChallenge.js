@@ -17,10 +17,10 @@ const ROUND_TIMEOUT_MS = 100_000;
 const BETWEEN_ROUNDS_MS = 8_000;
 const ROUND_WIN_COINS = 25;
 
-const BTN_CHALLENGE_ACCEPT = "story_challenge_accept:";
-const BTN_CHALLENGE_DECLINE = "story_challenge_decline:";
-const BTN_GUESS = "story_guess:";
-const BTN_EXIT = "story_exit:";
+const BTN_CHALLENGE_ACCEPT = "iq_challenge_accept:";
+const BTN_CHALLENGE_DECLINE = "iq_challenge_decline:";
+const BTN_GUESS = "iq_guess:";
+const BTN_EXIT = "iq_exit:";
 
 const pendingChallenges = new Map();
 const activeGames = new Map();
@@ -43,12 +43,9 @@ const pickFirstString = (source, keys) => {
   return "";
 };
 
-const getStoryChannelConfigId = () => {
+const getIqChallengeChannelConfigId = () => {
   return pickFirstString(config, [
-    "storyChallengeChannelId",
-    "suspenseStoryChannelId",
-    "challengeStoryChannelId",
-    "storyGameChannelId",
+    "iqChallengeChannelId",
   ]);
 };
 
@@ -113,8 +110,8 @@ const parseMentionedUser = async (message, raw) => {
   return client.users.fetch(cleaned).catch(() => null);
 };
 
-const resolveStoryChannel = async (message) => {
-  const configured = getStoryChannelConfigId();
+const resolveIqChallengeChannel = async (message) => {
+  const configured = getIqChallengeChannelConfigId();
   if (!configured) return null;
   const channel = message.guild.channels.cache.get(configured) || await message.guild.channels.fetch(configured).catch(() => null);
   if (!channel || !channel.isTextBased()) return null;
@@ -145,23 +142,23 @@ const cleanupGame = (game) => {
 
 const optionLetter = (index) => ["A", "B", "C", "D"][index] || "?";
 
-const normalizeStoryPacket = (rawPacket, fallbackPacket) => {
+const normalizeIqPacket = (rawPacket, fallbackPacket) => {
   if (!rawPacket || typeof rawPacket !== "object") return fallbackPacket;
 
-  const story = String(rawPacket.story || "").trim();
-  const question = String(rawPacket.question || "").trim() || "Who is responsible?";
+  const prompt = String(rawPacket.prompt || "").trim();
+  const question = String(rawPacket.question || "").trim() || "Which option is correct?";
   const options = Array.isArray(rawPacket.options)
     ? rawPacket.options.slice(0, 4).map((entry) => String(entry || "").trim())
     : [];
   const answerIndex = Number(rawPacket.answerIndex);
   const reveal = String(rawPacket.answerReveal || "").trim();
 
-  if (!story || options.length !== 4 || options.some((entry) => !entry) || !Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex > 3) {
+  if (!prompt || options.length !== 4 || options.some((entry) => !entry) || !Number.isInteger(answerIndex) || answerIndex < 0 || answerIndex > 3) {
     return fallbackPacket;
   }
 
   return {
-    story,
+    prompt,
     question,
     options,
     answerIndex,
@@ -183,34 +180,41 @@ const extractFirstJsonObject = (text) => {
   }
 };
 
-const fallbackMysteryFactory = ({ roundNumber }) => {
+const fallbackReasoningFactory = ({ roundNumber }) => {
   const templates = [
     {
-      story: `At Halden Manor, the lights went out for 20 seconds. When the lights came back, host Dev was dead and a rare map was missing. Four people were there: Ira, Naina, Arvind, and Meera. Naina said she stayed by the fireplace. Meera said she dropped to the floor. Arvind said the door got stuck. Ira said he stood by the shelf. Police found a wet half-moon shoeprint near Dev's desk and fresh ink on the desk. Earlier, Ira had said his boots make a half-moon print. Dev's last note ended with: "The map never leaves with the one who..."`,
-      question: "Who murdered Dev Malhotra?",
-      options: ["Professor Ira Sen", "Naina Roy", "Inspector Arvind Bahl", "Meera Dutt"],
+      prompt: "A, C, F, J, O, ?",
+      question: "What comes next in the sequence?",
+      options: ["U", "T", "V", "S"],
       answerIndex: 0,
-      answerReveal: "Professor Ira Sen is the murderer. The fresh ink smear and the unique half-moon boot print connect him to the desk during blackout conditions."
+      answerReveal: "The letters advance by +2 each time: A→C, C→F, F→J, J→O, so the next is U."
     },
     {
-      story: `At Kestrel Junction, an alarm sent everyone to the control cabin. Inside, Leela's deputy was unconscious and part of an audit record was burned. Four suspects were nearby: Leela, Harsh, Pooja, and Kabir. Harsh said he stayed at the counter. Pooja said she called security. Kabir said he was fixing a panel. But camera B froze for one minute before the attack, and only one person could open that camera case without tools. Grease was found on the cabin door and burned paper. It matched maintenance grease. Kabir also had a fresh burn on one glove.`,
-      question: "Who sabotaged the records and attacked the deputy?",
-      options: ["Leela", "Harsh", "Pooja", "Kabir"],
-      answerIndex: 3,
-      answerReveal: "Kabir is responsible. He had privileged mechanical access to freeze the camera, rail grease traces on the latch and ledger, and burn marks consistent with tampering."
+      prompt: "All engineers are problem solvers. Some problem solvers are not coders. Which statement must be true?",
+      question: "Which conclusion is logically valid?",
+      options: ["All engineers are coders.", "Some engineers are not coders.", "Some coders are engineers.", "All problem solvers are engineers."],
+      answerIndex: 1,
+      answerReveal: "We know all engineers are problem solvers, and some problem solvers are not coders. This means not all problem solvers are coders, so at least some engineers are not coders."
     },
     {
-      story: `At Clover Street Cinema, the fire curtain dropped early and people panicked. During the chaos, a rare film reel disappeared and owner Rakesh was injured. Four people had access: Rakesh, Alina, Yusuf, and Tara. Alina said she argued with Rakesh near the posters. Yusuf said he was fixing a fuse downstairs. Tara said she stayed in the booth writing labels. Police found a fake booth note: "Reel moved 8:37." Tara's normal notes do not look like that. A copied key was also found near the curtain controls. Only one person usually handles both archive keys and stage systems.`,
-      question: "Who orchestrated the theft and assault?",
-      options: ["Rakesh", "Alina", "Yusuf", "Tara"],
-      answerIndex: 3,
-      answerReveal: "Tara did it. The fake booth log style, access overlap between archive and mechanics, and the duplicated brass key indicate deliberate staging by the archivist."
+      prompt: "A clock shows 3:15. The minute hand points to 3 and the hour hand points between 3 and 4. What is the smaller angle between the hands?",
+      question: "What is the smaller angle between the hands?",
+      options: ["0°", "7.5°", "22.5°", "45°"],
+      answerIndex: 1,
+      answerReveal: "At 3:15, the minute hand is at 90° and the hour hand is at 97.5°, so the difference is 7.5°. The other choices are distractors."
+    },
+    {
+      prompt: "In a box are 3 red, 4 blue, and 5 green balls. If you pick one without looking, what is the probability it is not blue?",
+      question: "What is the chance the ball is not blue?",
+      options: ["3/12", "4/12", "8/12", "9/12"],
+      answerIndex: 2,
+      answerReveal: "There are 12 total balls and 4 blue ones. The non-blue total is 8, so the probability is 8/12 = 2/3."
     },
   ];
 
   const base = templates[(Math.max(1, roundNumber) - 1) % templates.length];
   return {
-    story: base.story,
+    prompt: base.prompt,
     question: base.question,
     options: base.options,
     answerIndex: base.answerIndex,
@@ -218,17 +222,17 @@ const fallbackMysteryFactory = ({ roundNumber }) => {
   };
 };
 
-const generateAiStoryPacket = async ({ guildName, challengerTag, opponentTag, roundNumber }) => {
+const generateAiIqPacket = async ({ guildName, challengerTag, opponentTag, roundNumber }) => {
   if (!AI_RUNTIME.apiKey) {
-    return fallbackMysteryFactory({ roundNumber });
+    return fallbackReasoningFactory({ roundNumber });
   }
 
   const systemPrompt = [
-    "You write suspense mystery stories for a Discord guessing game.",
+    "You write short IQ and reasoning challenge questions for a Discord duel game.",
     "Output strict JSON only.",
-    "Create a short and very clear mystery with easy difficulty.",
-    "Use simple English and easy-to-follow clues.",
-    "Keep sentences short and avoid rare words.",
+    "Create a clear puzzle suitable for general audience with one correct answer.",
+    "Use logic, pattern recognition, arithmetic, word reasoning, or basic deduction.",
+    "Keep the prompt concise and easy to understand.",
     "Exactly 4 options and one correct answer.",
     "No sexual content, hate, or graphic violence.",
   ].join(" ");
@@ -239,13 +243,13 @@ const generateAiStoryPacket = async ({ guildName, challengerTag, opponentTag, ro
     `Round: ${roundNumber}`,
     "Return JSON with this exact schema:",
     "{",
-    "  \"story\": \"(80-120 words suspense mystery, easy to read)\",",
-    "  \"question\": \"(e.g. Who is the murderer?)\",",
+    "  \"prompt\": \"(the reasoning question or short puzzle, 1 sentence or short clause)\",",
+    "  \"question\": \"(what the player must solve)\",",
     "  \"options\": [\"option 1\", \"option 2\", \"option 3\", \"option 4\"],",
     "  \"answerIndex\": 0,",
     "  \"answerReveal\": \"(2-3 sentence explanation why the correct option is right)\"",
     "}",
-    "Constraints: story must be concise and understandable, clues should be easy for normal readers to follow, options must map clearly to suspects in story, answerIndex must be 0-3, no markdown fences.",
+    "Constraints: use easy but true IQ/reasoning logic, keep clues clear, ensure only one valid answer, answerIndex must be 0-3, no markdown fences.",
   ].join("\n");
 
   const payload = {
@@ -267,13 +271,13 @@ const generateAiStoryPacket = async ({ guildName, challengerTag, opponentTag, ro
   });
 
   if (!response.ok) {
-    throw new Error(`Story generation request failed (${response.status})`);
+    throw new Error(`IQ generation request failed (${response.status})`);
   }
 
   const json = await response.json();
   const content = String(json?.choices?.[0]?.message?.content || "").trim();
   const parsed = extractFirstJsonObject(content);
-  return normalizeStoryPacket(parsed, fallbackMysteryFactory({ roundNumber }));
+  return normalizeIqPacket(parsed, fallbackReasoningFactory({ roundNumber }));
 };
 
 const buildRoundPayload = (game, packet) => {
@@ -283,11 +287,11 @@ const buildRoundPayload = (game, packet) => {
 
   const embed = new EmbedBuilder()
     .setColor("#2f3136")
-    .setTitle(`🕵️ Suspense Round ${game.roundNumber}`)
+    .setTitle(`🧠 IQ Challenge Round ${game.roundNumber}`)
     .setDescription([
       `Duo: ${userMention(game.players[0])} vs ${userMention(game.players[1])}`,
       "",
-      packet.story,
+      `**Puzzle:** ${packet.prompt}`,
       "",
       `**Question:** ${packet.question}`,
       "",
@@ -361,7 +365,7 @@ const announceRoundResult = async (game, roundData, resolved) => {
       `Next round starts in ${Math.floor(BETWEEN_ROUNDS_MS / 1000)} seconds unless someone exits.`,
     ].filter(Boolean).join("\n"));
 
-  await game.storyChannel.send({ embeds: [summary] }).catch(() => {});
+  await game.challengeChannel.send({ embeds: [summary] }).catch(() => {});
 };
 
 const endGame = async (game, reasonText) => {
@@ -376,7 +380,7 @@ const endGame = async (game, reasonText) => {
 
   const finalEmbed = new EmbedBuilder()
     .setColor("#e74c3c")
-    .setTitle("🎬 Suspense Match Ended")
+    .setTitle("🧠 IQ Challenge Ended")
     .setDescription([
       reasonText || "The match has ended.",
       "",
@@ -384,7 +388,7 @@ const endGame = async (game, reasonText) => {
       `Final balances: ${userMention(game.players[0])} **${finalA}** | ${userMention(game.players[1])} **${finalB}** quest coins`,
     ].join("\n"));
 
-  await game.storyChannel.send({ embeds: [finalEmbed], components: [] }).catch(() => {});
+  await game.challengeChannel.send({ embeds: [finalEmbed], components: [] }).catch(() => {});
   cleanupGame(game);
 };
 
@@ -426,15 +430,15 @@ const startNextRound = async (game) => {
     const challenger = await client.users.fetch(game.players[0]).catch(() => null);
     const opponent = await client.users.fetch(game.players[1]).catch(() => null);
 
-    packet = await generateAiStoryPacket({
+    packet = await generateAiIqPacket({
       guildName: game.guildName,
       challengerTag: challenger?.tag || game.players[0],
       opponentTag: opponent?.tag || game.players[1],
       roundNumber: game.roundNumber,
     });
   } catch (error) {
-    console.error("story challenge generation failed:", error);
-    packet = fallbackMysteryFactory({ roundNumber: game.roundNumber });
+    console.error("iq challenge generation failed:", error);
+    packet = fallbackReasoningFactory({ roundNumber: game.roundNumber });
   }
 
   game.currentRound = {
@@ -445,7 +449,7 @@ const startNextRound = async (game) => {
   };
 
   const payload = buildRoundPayload(game, packet);
-  await game.storyChannel.send(payload).catch(() => {});
+  await game.challengeChannel.send(payload).catch(() => {});
 
   game.roundTimeout = setTimeout(async () => {
     game.roundTimeout = null;
@@ -462,7 +466,7 @@ const startGameFromChallenge = async (challenge) => {
     guildId: challenge.guildId,
     guildName: challenge.guildName,
     players: [challenge.challengerId, challenge.opponentId],
-    storyChannel: challenge.storyChannel,
+    challengeChannel: challenge.challengeChannel,
     roundNumber: 0,
     currentRound: null,
     scores: new Map([
@@ -479,17 +483,18 @@ const startGameFromChallenge = async (challenge) => {
   userToGame.set(getUserGameKey(game.guildId, game.players[1]), game.id);
 
   await challenge.requestChannel.send(
-    `${userMention(challenge.opponentId)} accepted the challenge. Match started in ${challenge.storyChannel}.`
+    `${userMention(challenge.opponentId)} accepted the challenge. Match started in ${challenge.challengeChannel}.`
   ).catch(() => {});
 
-  await game.storyChannel.send({
+  await game.challengeChannel.send({
     embeds: [
       new EmbedBuilder()
         .setColor("#3498db")
-        .setTitle("🕵️ Duo Suspense Challenge Started")
+        .setTitle("🧠 IQ Challenge Started")
         .setDescription([
           `${userMention(challenge.challengerId)} vs ${userMention(challenge.opponentId)}`,
           "Each round has one correct answer out of 4 options.",
+          "You will solve logic, reasoning, and IQ-style questions.",
           `Round winner gets **${ROUND_WIN_COINS} quest coins**.`,
           "If both are correct, the first correct answer wins the reward.",
           "Press Exit Match anytime to end the game.",
@@ -528,7 +533,7 @@ const handleChallengeCommand = async (message) => {
       "Usage:",
       "ct challenge @user",
       "The challenged user can accept or decline via buttons.",
-      "This command only works in the dedicated story channel set by storyChallengeChannelId in config.json.",
+      "This command only works in the dedicated IQ challenge channel set by iqChallengeChannelId in config.json.",
     ].join("\n")).catch(() => {});
     return;
   }
@@ -549,16 +554,16 @@ const handleChallengeCommand = async (message) => {
     return;
   }
 
-  const storyChannel = await resolveStoryChannel(message);
-  if (!storyChannel) {
+  const iqChannel = await resolveIqChallengeChannel(message);
+  if (!iqChannel) {
     await message.reply(
-      "I could not resolve the dedicated story channel. Set storyChallengeChannelId in config.json."
+      "I could not resolve the dedicated IQ challenge channel. Set iqChallengeChannelId in config.json."
     ).catch(() => {});
     return;
   }
 
-  if (message.channel.id !== storyChannel.id) {
-    await message.reply(`This command only works in ${storyChannel}.`).catch(() => {});
+  if (message.channel.id !== iqChannel.id) {
+    await message.reply(`This command only works in ${iqChannel}.`).catch(() => {});
     return;
   }
 
@@ -578,10 +583,10 @@ const handleChallengeCommand = async (message) => {
 
   const challengeEmbed = new EmbedBuilder()
     .setColor("#9b59b6")
-    .setTitle("🎲 Suspense Duo Challenge")
+    .setTitle("🧠 IQ Challenge")
     .setDescription([
-      `${userMention(message.author.id)} challenged ${userMention(target.id)} to a suspense guessing duel.`,
-      `Story channel: ${storyChannel}`,
+      `${userMention(message.author.id)} challenged ${userMention(target.id)} to an IQ reasoning duel.`,
+      `Challenge channel: ${iqChannel}`,
       "The challenged user must accept or decline within 90 seconds.",
     ].join("\n"));
 
@@ -610,7 +615,7 @@ const handleChallengeCommand = async (message) => {
     challengerId: message.author.id,
     opponentId: target.id,
     requestChannel: message.channel,
-    storyChannel,
+    challengeChannel: iqChannel,
     timeout,
   });
 };
@@ -720,12 +725,12 @@ const handleGuessAndExitButtons = async (interaction) => {
   return true;
 };
 
-const storyChallenge = () => {
+const iqChallenge = () => {
   client.on("messageCreate", async (message) => {
     try {
       await handleChallengeCommand(message);
     } catch (error) {
-      console.error("story challenge command error:", error);
+      console.error("iq challenge command error:", error);
     }
   });
 
@@ -737,7 +742,7 @@ const storyChallenge = () => {
       if (handledChallenge) return;
       await handleGuessAndExitButtons(interaction);
     } catch (error) {
-      console.error("story challenge interaction error:", error);
+      console.error("iq challenge interaction error:", error);
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({ content: "Something went wrong in the challenge flow.", flags: 64 }).catch(() => {});
       }
@@ -745,4 +750,4 @@ const storyChallenge = () => {
   });
 };
 
-module.exports = storyChallenge;
+module.exports = iqChallenge;

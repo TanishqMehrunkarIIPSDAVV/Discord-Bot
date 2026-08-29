@@ -240,7 +240,7 @@ safeLoad("./features/suggestions");
 safeLoad("./features/guildInventory");
 safeLoad("./features/quest");
 safeLoad("./features/questShop");
-safeLoad("./features/storyChallenge");
+safeLoad("./features/iqChallenge");
 safeLoad("./features/tickets");
 safeLoad("./features/memberswithout");
 client.login(token).catch((err) => {
