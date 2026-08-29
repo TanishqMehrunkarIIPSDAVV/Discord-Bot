@@ -180,81 +180,142 @@ const extractFirstJsonObject = (text) => {
   }
 };
 
-const fallbackReasoningFactory = ({ roundNumber }) => {
+const fallbackReasoningFactory = ({ roundNumber, priorPrompts = [] }) => {
   const templates = [
     {
-      prompt: "A, C, F, J, O, ?",
-      question: "What comes next in the sequence?",
-      options: ["U", "T", "V", "S"],
+      prompt: "2, 6, 12, 20, 30, ?",
+      question: "What is the next number in the sequence?",
+      options: ["36", "42", "40", "48"],
+      answerIndex: 1,
+      answerReveal: "The differences are +4, +6, +8, +10, so the next difference is +12. 30 + 12 = 42."
+    },
+    {
+      prompt: "81, 27, 9, 3, ?",
+      question: "What is the next value?",
+      options: ["1", "2", "0", "3"],
       answerIndex: 0,
-      answerReveal: "The letters advance by +2 each time: A→C, C→F, F→J, J→O, so the next is U."
+      answerReveal: "Each term is divided by 3, so 3 ÷ 3 = 1."
     },
     {
-      prompt: "All engineers are problem solvers. Some problem solvers are not coders. Which statement must be true?",
-      question: "Which conclusion is logically valid?",
-      options: ["All engineers are coders.", "Some engineers are not coders.", "Some coders are engineers.", "All problem solvers are engineers."],
-      answerIndex: 1,
-      answerReveal: "We know all engineers are problem solvers, and some problem solvers are not coders. This means not all problem solvers are coders, so at least some engineers are not coders."
-    },
-    {
-      prompt: "A clock shows 3:15. The minute hand points to 3 and the hour hand points between 3 and 4. What is the smaller angle between the hands?",
-      question: "What is the smaller angle between the hands?",
-      options: ["0°", "7.5°", "22.5°", "45°"],
-      answerIndex: 1,
-      answerReveal: "At 3:15, the minute hand is at 90° and the hour hand is at 97.5°, so the difference is 7.5°. The other choices are distractors."
-    },
-    {
-      prompt: "In a box are 3 red, 4 blue, and 5 green balls. If you pick one without looking, what is the probability it is not blue?",
-      question: "What is the chance the ball is not blue?",
-      options: ["3/12", "4/12", "8/12", "9/12"],
+      prompt: "If 3x + 7 = 25, what is x?",
+      question: "Solve for x.",
+      options: ["4", "5", "6", "7"],
       answerIndex: 2,
-      answerReveal: "There are 12 total balls and 4 blue ones. The non-blue total is 8, so the probability is 8/12 = 2/3."
+      answerReveal: "3x = 18, so x = 6."
     },
+    {
+      prompt: "What is 15% of 240?",
+      question: "Choose the correct value.",
+      options: ["24", "30", "36", "42"],
+      answerIndex: 2,
+      answerReveal: "15% = 0.15, and 0.15 × 240 = 36."
+    },
+    {
+      prompt: "3, 9, 27, 81, ?",
+      question: "What is the next number?",
+      options: ["162", "243", "324", "216"],
+      answerIndex: 1,
+      answerReveal: "Each term is multiplied by 3, so 81 × 3 = 243."
+    },
+    {
+      prompt: "A car travels 180 km in 3 hours. What is its average speed?",
+      question: "Choose the correct speed.",
+      options: ["40 km/h", "50 km/h", "60 km/h", "70 km/h"],
+      answerIndex: 2,
+      answerReveal: "Speed = distance ÷ time = 180 ÷ 3 = 60 km/h."
+    },
+    {
+      prompt: "Find the median of 3, 8, 1, 9, 4.",
+      question: "What is the median?",
+      options: ["3", "4", "5", "8"],
+      answerIndex: 1,
+      answerReveal: "Sorted values are 1, 3, 4, 8, 9. The middle value is 4."
+    },
+    {
+      prompt: "5, 10, 20, 40, ?",
+      question: "What is the next term?",
+      options: ["50", "80", "60", "90"],
+      answerIndex: 1,
+      answerReveal: "Each term doubles, so 40 × 2 = 80."
+    },
+    {
+      prompt: "What is the value of 7² + 4²?",
+      question: "Calculate the result.",
+      options: ["49", "65", "80", "97"],
+      answerIndex: 1,
+      answerReveal: "7² = 49 and 4² = 16, so 49 + 16 = 65."
+    },
+    {
+      prompt: "The sum of the first 5 even numbers is ?",
+      question: "What is the total?",
+      options: ["20", "24", "30", "36"],
+      answerIndex: 2,
+      answerReveal: "The first 5 even numbers are 2, 4, 6, 8, 10. Their sum is 30."
+    },
+    {
+      prompt: "6, 12, 24, 48, ?",
+      question: "What comes next?",
+      options: ["64", "96", "72", "84"],
+      answerIndex: 1,
+      answerReveal: "Each number doubles, so 48 × 2 = 96."
+    },
+    {
+      prompt: "If 4 notebooks cost $12, what is the cost of 7 notebooks?",
+      question: "Choose the correct total cost.",
+      options: ["$18", "$21", "$24", "$28"],
+      answerIndex: 1,
+      answerReveal: "One notebook costs $3, so 7 notebooks cost 7 × 3 = $21."
+    }
   ];
 
-  const base = templates[(Math.max(1, roundNumber) - 1) % templates.length];
+  const used = new Set((Array.isArray(priorPrompts) ? priorPrompts : []).map((entry) => String(entry || "").trim()));
+  const pool = templates.filter((question) => !used.has(question.prompt));
+  const selected = (pool.length ? pool : templates)[Math.floor(Math.random() * (pool.length ? pool.length : templates.length))];
+
   return {
-    prompt: base.prompt,
-    question: base.question,
-    options: base.options,
-    answerIndex: base.answerIndex,
-    answerReveal: base.answerReveal,
+    prompt: selected.prompt,
+    question: selected.question,
+    options: selected.options,
+    answerIndex: selected.answerIndex,
+    answerReveal: selected.answerReveal,
   };
 };
 
-const generateAiIqPacket = async ({ guildName, challengerTag, opponentTag, roundNumber }) => {
+const generateAiIqPacket = async ({ guildName, challengerTag, opponentTag, roundNumber, priorPrompts = [] }) => {
   if (!AI_RUNTIME.apiKey) {
-    return fallbackReasoningFactory({ roundNumber });
+    return fallbackReasoningFactory({ roundNumber, priorPrompts });
   }
 
   const systemPrompt = [
-    "You write short IQ and reasoning challenge questions for a Discord duel game.",
+    "You write short mathematics IQ and reasoning challenge questions for a Discord duel game.",
     "Output strict JSON only.",
-    "Create a clear puzzle suitable for general audience with one correct answer.",
-    "Use logic, pattern recognition, arithmetic, word reasoning, or basic deduction.",
+    "Create a clear math-based puzzle suitable for a general audience with one correct answer.",
+    "Use arithmetic, sequences, series, algebra, percentages, ratios, number patterns, and basic quantitative logic.",
     "Keep the prompt concise and easy to understand.",
     "Exactly 4 options and one correct answer.",
-    "No sexual content, hate, or graphic violence.",
+    "No story questions, no word riddles, no sexual content, no hate, and no graphic violence.",
+    "Do not repeat previous questions. Make each round different from the ones listed below.",
   ].join(" ");
 
   const userPrompt = [
     `Guild name: ${guildName || "Unknown"}`,
     `Players: ${challengerTag} vs ${opponentTag}`,
     `Round: ${roundNumber}`,
+    priorPrompts.length ? `Previous prompts to avoid: ${priorPrompts.slice(-10).join(" | ")}` : "Previous prompts to avoid: none",
     "Return JSON with this exact schema:",
     "{",
-    "  \"prompt\": \"(the reasoning question or short puzzle, 1 sentence or short clause)\",",
+    "  \"prompt\": \"(a short math or number-pattern question)\",",
     "  \"question\": \"(what the player must solve)\",",
     "  \"options\": [\"option 1\", \"option 2\", \"option 3\", \"option 4\"],",
     "  \"answerIndex\": 0,",
-    "  \"answerReveal\": \"(2-3 sentence explanation why the correct option is right)\"",
+    "  \"answerReveal\": \"(2-3 sentence explanation)\"",
     "}",
-    "Constraints: use easy but true IQ/reasoning logic, keep clues clear, ensure only one valid answer, answerIndex must be 0-3, no markdown fences.",
+    "Constraints: use easy but true math reasoning; prefer sequences, series, arithmetic, percentages, ratios, algebra, or quick number puzzles; ensure only one valid answer; answerIndex must be 0-3; no markdown fences; avoid repeating any previous prompts.",
   ].join("\n");
 
   const payload = {
     model: AI_RUNTIME.model,
-    temperature: 0.75,
+    temperature: 1.1,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -435,11 +496,14 @@ const startNextRound = async (game) => {
       challengerTag: challenger?.tag || game.players[0],
       opponentTag: opponent?.tag || game.players[1],
       roundNumber: game.roundNumber,
+      priorPrompts: game.priorPrompts || [],
     });
   } catch (error) {
     console.error("iq challenge generation failed:", error);
     packet = fallbackReasoningFactory({ roundNumber: game.roundNumber });
   }
+
+  game.priorPrompts = Array.isArray(game.priorPrompts) ? [...game.priorPrompts, packet.prompt] : [packet.prompt];
 
   game.currentRound = {
     answerIndex: packet.answerIndex,
@@ -469,6 +533,7 @@ const startGameFromChallenge = async (challenge) => {
     challengeChannel: challenge.challengeChannel,
     roundNumber: 0,
     currentRound: null,
+    priorPrompts: [],
     scores: new Map([
       [challenge.challengerId, 0],
       [challenge.opponentId, 0],
